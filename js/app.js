@@ -122,7 +122,7 @@ class App {
     });
   
     // Instead of directly loading the default product, show the landing overlay.
-    this.showLandingOverlay();
+    // this.showLandingOverlay();
 
     this.animate();
   }
@@ -378,9 +378,12 @@ class App {
     if (loadingOverlay) loadingOverlay.style.display = 'flex';
     
     try {
-        // Fetch the models list from the static JSON file
+        // Add console.log to debug
+        console.log('Fetching files.json...');
         const response = await fetch('./assets/files.json');
+        console.log('Response:', response);
         const data = await response.json();
+        console.log('Data:', data);
         const files = data.models;
         
         if (loadingOverlay) loadingOverlay.style.display = 'none';
@@ -407,23 +410,27 @@ class App {
         
         const title = document.createElement('h2');
         title.textContent = 'Browse Models';
+        title.style.marginBottom = '10px';
         modalContainer.appendChild(title);
 
         const description = document.createElement('p');
-        if (files.length === 0) {
+        if (!files || files.length === 0) {
             description.textContent = 'No models found.';
         } else {
-            description.textContent = 'Select models to load:';
+            description.textContent = `Found ${files.length} models. Select models to load:`;
         }
         modalContainer.appendChild(description);
         
         const fileList = document.createElement('div');
         fileList.style.marginTop = '10px';
         
-        files.forEach(file => {
-            if (file.name.endsWith('.glb') || file.name.endsWith('.gltf')) {
+        if (files && files.length > 0) {
+            files.forEach(file => {
                 const div = document.createElement('div');
-                div.style.marginBottom = '5px';
+                div.style.marginBottom = '10px';
+                div.style.padding = '5px';
+                div.style.borderRadius = '4px';
+                div.style.backgroundColor = '#f5f5f5';
                 
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
@@ -433,13 +440,13 @@ class App {
                 const label = document.createElement('label');
                 label.htmlFor = file.name;
                 label.textContent = file.name;
-                label.style.marginLeft = '5px';
+                label.style.marginLeft = '8px';
                 
                 div.appendChild(checkbox);
                 div.appendChild(label);
                 fileList.appendChild(div);
-            }
-        });
+            });
+        }
         
         modalContainer.appendChild(fileList);
         
@@ -452,18 +459,18 @@ class App {
         loadButton.style.marginLeft = '10px';
         loadButton.style.padding = '8px 16px';
         loadButton.style.border = 'none';
-        loadButton.style.borderRadius = '9999px';
-        loadButton.style.background = '#d00024';
+        loadButton.style.borderRadius = '4px';
+        loadButton.style.background = '#007bff';
         loadButton.style.color = 'white';
         loadButton.style.cursor = 'pointer';
         
         const cancelButton = document.createElement('button');
         cancelButton.textContent = 'Cancel';
         cancelButton.style.padding = '8px 16px';
-        cancelButton.style.border = 'none';
-        cancelButton.style.borderRadius = '9999px';
-        cancelButton.style.background = '#999';
-        cancelButton.style.color = 'white';
+        cancelButton.style.border = '1px solid #ddd';
+        cancelButton.style.borderRadius = '4px';
+        cancelButton.style.background = 'white';
+        cancelButton.style.color = '#333';
         cancelButton.style.cursor = 'pointer';
         
         buttonsDiv.appendChild(cancelButton);
@@ -486,6 +493,7 @@ class App {
                 this.clearExistingModels();
                 
                 for(const file of selected) {
+                    console.log('Loading model:', file.url);
                     await this.loadModel(file.url, file.name.replace('.glb', '').replace('.gltf', ''));
                 }
                 
@@ -504,7 +512,8 @@ class App {
     } catch (error) {
         if (loadingOverlay) loadingOverlay.style.display = 'none';
         console.error("Error fetching models:", error);
-        alert("Error accessing models. Please try again.");
+        console.log("Full error details:", error);
+        alert("Error accessing models. Please check the console for details.");
     }
   }
 
@@ -801,7 +810,7 @@ class App {
     const parts = [
       { name: 'blade', file: './assets/kool-mandoline-blade.glb' },
       { name: 'frame', file: './assets/kool-mandoline-frame.glb' },
-      { name: 'handguard', file: 'k./assets/ool-mandoline-handguard.glb' },
+      { name: 'handguard', file: './assets/ool-mandoline-handguard.glb' },
       { name: 'handle', file: './assets/kool-mandoline-handletpe.glb' }
     ];
     
