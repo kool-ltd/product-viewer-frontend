@@ -1,8 +1,8 @@
-import * as THREE from '/node_modules/three/build/three.module.js';
-import { OrbitControls } from '/node_modules/three/examples/jsm/controls/OrbitControls.js';
-import { ARButton } from '/node_modules/three/examples/jsm/webxr/ARButton.js';
-import { RGBELoader } from '/node_modules/three/examples/jsm/loaders/RGBELoader.js';
-import { XRControllerModelFactory } from '/node_modules/three/examples/jsm/webxr/XRControllerModelFactory.js';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { ARButton } from 'three/addons/webxr/ARButton.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { InteractionManager } from './InteractionManager.js';
 import { setupUIControls } from './uiControls.js';
 import { showConfirmationModal } from './modalManager.js';

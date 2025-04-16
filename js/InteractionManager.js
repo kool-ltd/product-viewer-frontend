@@ -1,6 +1,6 @@
-import * as THREE from '/node_modules/three/build/three.module.js';
-import { OrbitControls } from '/node_modules/three/examples/jsm/controls/OrbitControls.js';
-import { XRControllerModelFactory } from '/node_modules/three/examples/jsm/webxr/XRControllerModelFactory.js';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
 export class InteractionManager {
     constructor(scene, camera, renderer, domElement) {

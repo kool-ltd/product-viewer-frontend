@@ -1,7 +1,7 @@
 // uiControls.js
 
-import * as THREE from '/node_modules/three/build/three.module.js';
-import { ARButton } from '/node_modules/three/examples/jsm/webxr/ARButton.js';
+import * as THREE from 'three';
+import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { showConfirmationModal } from './modalManager.js';
 
 // Function to detect if we should use compact UI with icons
