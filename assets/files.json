@@ -1,0 +1,16 @@
+{
+  "models": [
+    {
+      "name": "Secondz-New-Design-Round-S",
+      "url": "./assets/files/Secondz-New-Design-Round-S.glb"
+    },
+    {
+      "name": "Secondz-New-Design-Round-L",
+      "url": "./assets/files/Secondz-New-Design-Round-L.glb"
+    },
+    {
+      "name": "Secondz-New-Design-Set-Round",
+      "url": "./assets/files/Secondz-New-Design-Set-Round.glb"
+    },
+  ]
+}
