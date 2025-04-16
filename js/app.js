@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { InteractionManager } from './InteractionManager.js';
 import { setupUIControls } from './uiControls.js';
 import { showConfirmationModal } from './modalManager.js';
@@ -44,11 +45,7 @@ class App {
     this.loadingManager = new THREE.LoadingManager(() => {});
     this.loadingManager.onProgress = (url, loaded, total) => {};
     
-    // Modify import to match the new import
-    import('/node_modules/three/examples/jsm/loaders/GLTFLoader.js').then((module) => { 
-      this.gltfLoader = new module.GLTFLoader(this.loadingManager);
-    });
-
+    this.gltfLoader = new GLTFLoader(this.loadingManager);
     this.rgbeLoader = new RGBELoader(this.loadingManager);
 
     this.init();
@@ -377,185 +374,137 @@ class App {
   // Browser-Based File Browser (using IndexedDB)
   // -----------------------------------------------------------------------------
   async showBrowseInterface() {
-    // Show loading overlay immediately when Browse is clicked
     const loadingOverlay = document.getElementById('loading-overlay');
     if (loadingOverlay) loadingOverlay.style.display = 'flex';
     
     try {
-      // Initialize IndexedDB if not already done
-      if (!this.db) {
-        await this.initIndexedDB();
-      }
-      
-      // Get the list of models from IndexedDB
-      const savedModels = await this.listModelsFromIndexedDB();
-      
-      // Hide loading overlay
-      if (loadingOverlay) loadingOverlay.style.display = 'none';
+        // Fetch the models list from the static JSON file
+        const response = await fetch('./assets/files.json');
+        const data = await response.json();
+        const files = data.models;
+        
+        if (loadingOverlay) loadingOverlay.style.display = 'none';
 
-      const modalOverlay = document.createElement('div');
-      modalOverlay.style.position = 'fixed';
-      modalOverlay.style.top = '0';
-      modalOverlay.style.left = '0';
-      modalOverlay.style.width = '100%';
-      modalOverlay.style.height = '100%';
-      modalOverlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
-      modalOverlay.style.display = 'flex';
-      modalOverlay.style.alignItems = 'center';
-      modalOverlay.style.justifyContent = 'center';
-      modalOverlay.style.zIndex = '10000';
-      
-      const modalContainer = document.createElement('div');
-      modalContainer.style.backgroundColor = 'white';
-      modalContainer.style.padding = '20px';
-      modalContainer.style.borderRadius = '8px';
-      modalContainer.style.minWidth = '300px';
-      modalContainer.style.maxHeight = '80%';
-      modalContainer.style.overflowY = 'auto';
-      
-      const title = document.createElement('h2');
-      title.textContent = 'Browse Saved Models';
-      modalContainer.appendChild(title);
+        const modalOverlay = document.createElement('div');
+        modalOverlay.style.position = 'fixed';
+        modalOverlay.style.top = '0';
+        modalOverlay.style.left = '0';
+        modalOverlay.style.width = '100%';
+        modalOverlay.style.height = '100%';
+        modalOverlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
+        modalOverlay.style.display = 'flex';
+        modalOverlay.style.alignItems = 'center';
+        modalOverlay.style.justifyContent = 'center';
+        modalOverlay.style.zIndex = '10000';
+        
+        const modalContainer = document.createElement('div');
+        modalContainer.style.backgroundColor = 'white';
+        modalContainer.style.padding = '20px';
+        modalContainer.style.borderRadius = '8px';
+        modalContainer.style.minWidth = '300px';
+        modalContainer.style.maxHeight = '80%';
+        modalContainer.style.overflowY = 'auto';
+        
+        const title = document.createElement('h2');
+        title.textContent = 'Browse Models';
+        modalContainer.appendChild(title);
 
-      const description = document.createElement('p');
-      if (savedModels.length === 0) {
-        description.textContent = 'No saved models found. Upload some models first.';
-      } else {
-        description.textContent = 'Select models to load:';
-      }
-      modalContainer.appendChild(description);
-      
-      const fileList = document.createElement('div');
-      fileList.style.marginTop = '10px';
-      
-      if (savedModels.length > 0) {
-        savedModels.forEach(model => {
-          const div = document.createElement('div');
-          div.style.marginBottom = '5px';
-          div.style.display = 'flex';
-          div.style.justifyContent = 'space-between';
-          div.style.alignItems = 'center';
-          
-          const leftSection = document.createElement('div');
-          
-          const checkbox = document.createElement('input');
-          checkbox.type = 'checkbox';
-          checkbox.value = model.name;
-          checkbox.id = model.name;
-          
-          const label = document.createElement('label');
-          label.htmlFor = model.name;
-          label.textContent = model.name;
-          label.style.marginLeft = '5px';
-          
-          leftSection.appendChild(checkbox);
-          leftSection.appendChild(label);
-          
-          const deleteButton = document.createElement('button');
-          deleteButton.innerHTML = '<i class="fas fa-trash"></i>';
-          deleteButton.style.background = 'none';
-          deleteButton.style.border = 'none';
-          deleteButton.style.color = '#d00024';
-          deleteButton.style.cursor = 'pointer';
-          deleteButton.onclick = async (e) => {
-            e.stopPropagation();
-            if (confirm(`Delete "${model.name}"?`)) {
-              try {
-                await this.deleteModelFromIndexedDB(model.name);
-                div.remove();
-                if (fileList.children.length === 0) {
-                  description.textContent = 'No saved models found. Upload some models first.';
-                }
-              } catch (error) {
-                console.error("Error deleting model:", error);
-                alert("Failed to delete model");
-              }
+        const description = document.createElement('p');
+        if (files.length === 0) {
+            description.textContent = 'No models found.';
+        } else {
+            description.textContent = 'Select models to load:';
+        }
+        modalContainer.appendChild(description);
+        
+        const fileList = document.createElement('div');
+        fileList.style.marginTop = '10px';
+        
+        files.forEach(file => {
+            if (file.name.endsWith('.glb') || file.name.endsWith('.gltf')) {
+                const div = document.createElement('div');
+                div.style.marginBottom = '5px';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = file.url;
+                checkbox.id = file.name;
+                
+                const label = document.createElement('label');
+                label.htmlFor = file.name;
+                label.textContent = file.name;
+                label.style.marginLeft = '5px';
+                
+                div.appendChild(checkbox);
+                div.appendChild(label);
+                fileList.appendChild(div);
             }
-          };
-          
-          div.appendChild(leftSection);
-          div.appendChild(deleteButton);
-          fileList.appendChild(div);
-        });
-      }
-      
-      modalContainer.appendChild(fileList);
-      
-      const buttonsDiv = document.createElement('div');
-      buttonsDiv.style.marginTop = '20px';
-      buttonsDiv.style.textAlign = 'right';
-      
-      const loadButton = document.createElement('button');
-      loadButton.textContent = 'Load Selected';
-      loadButton.style.marginLeft = '10px';
-      loadButton.style.padding = '8px 16px';
-      loadButton.style.border = 'none';
-      loadButton.style.borderRadius = '9999px';
-      loadButton.style.background = '#d00024';
-      loadButton.style.color = 'white';
-      loadButton.style.cursor = 'pointer';
-      if (savedModels.length === 0) {
-        loadButton.disabled = true;
-        loadButton.style.background = '#999';
-      }
-      
-      const cancelButton = document.createElement('button');
-      cancelButton.textContent = 'Cancel';
-      cancelButton.style.padding = '8px 16px';
-      cancelButton.style.border = 'none';
-      cancelButton.style.borderRadius = '9999px';
-      cancelButton.style.background = '#999';
-      cancelButton.style.color = 'white';
-      cancelButton.style.cursor = 'pointer';
-      
-      buttonsDiv.appendChild(cancelButton);
-      buttonsDiv.appendChild(loadButton);
-      modalContainer.appendChild(buttonsDiv);
-      modalOverlay.appendChild(modalContainer);
-      document.body.appendChild(modalOverlay);
-      
-      loadButton.addEventListener('click', async () => {
-        const selected = [];
-        fileList.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
-          selected.push(cb.value);
         });
         
-        if(selected.length > 0) {
-          // Close the browse modal
-          document.body.removeChild(modalOverlay);
-          
-          // Show loading overlay before loading models
-          if (loadingOverlay) loadingOverlay.style.display = 'flex';
-          
-          this.clearExistingModels();
-          
-          for(const modelName of selected) {
-            try {
-              const modelBlob = await this.getModelFromIndexedDB(modelName);
-              const modelUrl = URL.createObjectURL(modelBlob);
-              await this.loadModel(modelUrl, modelName);
-            } catch (error) {
-              console.error(`Error loading model ${modelName}:`, error);
+        modalContainer.appendChild(fileList);
+        
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.style.marginTop = '20px';
+        buttonsDiv.style.textAlign = 'right';
+        
+        const loadButton = document.createElement('button');
+        loadButton.textContent = 'Load Selected';
+        loadButton.style.marginLeft = '10px';
+        loadButton.style.padding = '8px 16px';
+        loadButton.style.border = 'none';
+        loadButton.style.borderRadius = '9999px';
+        loadButton.style.background = '#d00024';
+        loadButton.style.color = 'white';
+        loadButton.style.cursor = 'pointer';
+        
+        const cancelButton = document.createElement('button');
+        cancelButton.textContent = 'Cancel';
+        cancelButton.style.padding = '8px 16px';
+        cancelButton.style.border = 'none';
+        cancelButton.style.borderRadius = '9999px';
+        cancelButton.style.background = '#999';
+        cancelButton.style.color = 'white';
+        cancelButton.style.cursor = 'pointer';
+        
+        buttonsDiv.appendChild(cancelButton);
+        buttonsDiv.appendChild(loadButton);
+        modalContainer.appendChild(buttonsDiv);
+        modalOverlay.appendChild(modalContainer);
+        document.body.appendChild(modalOverlay);
+        
+        loadButton.addEventListener('click', async () => {
+            const selected = [];
+            fileList.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                selected.push({ url: cb.value, name: cb.id });
+            });
+            
+            if(selected.length > 0) {
+                document.body.removeChild(modalOverlay);
+                
+                if (loadingOverlay) loadingOverlay.style.display = 'flex';
+                
+                this.clearExistingModels();
+                
+                for(const file of selected) {
+                    await this.loadModel(file.url, file.name.replace('.glb', '').replace('.gltf', ''));
+                }
+                
+                this.fitCameraToScene();
+                
+                if (loadingOverlay) loadingOverlay.style.display = 'none';
+            } else {
+                document.body.removeChild(modalOverlay);
             }
-          }
-          
-          this.fitCameraToScene();
-          
-          // Hide loading overlay
-          if (loadingOverlay) loadingOverlay.style.display = 'none';
-        } else {
-          document.body.removeChild(modalOverlay);
-        }
-      });
-      
-      cancelButton.addEventListener('click', () => {
-        document.body.removeChild(modalOverlay);
-      });
+        });
+        
+        cancelButton.addEventListener('click', () => {
+            document.body.removeChild(modalOverlay);
+        });
+        
     } catch (error) {
-      // Hide loading overlay in case of error
-      if (loadingOverlay) loadingOverlay.style.display = 'none';
-      console.error("Error accessing saved models:", error);
-      showConfirmationModal("Error accessing saved models. Please try again.");
+        if (loadingOverlay) loadingOverlay.style.display = 'none';
+        console.error("Error fetching models:", error);
+        alert("Error accessing models. Please try again.");
     }
   }
 
@@ -744,7 +693,7 @@ class App {
     this.scene.background = new THREE.Color(0xc0c0c1);
     this.createFloor(); // Add floor immediately
     this.rgbeLoader.load(
-      '../assets/brown_photostudio_02_2k.hdr',
+      './assets/brown_photostudio_02_2k.hdr',
       (texture) => {
         texture.mapping = THREE.EquirectangularReflectionMapping;
         this.scene.environment = texture;
@@ -850,10 +799,10 @@ class App {
     }
     this.clearExistingModels();
     const parts = [
-      { name: 'blade', file: 'kool-mandoline-blade.glb' },
-      { name: 'frame', file: 'kool-mandoline-frame.glb' },
-      { name: 'handguard', file: 'kool-mandoline-handguard.glb' },
-      { name: 'handle', file: 'kool-mandoline-handletpe.glb' }
+      { name: 'blade', file: './assets/kool-mandoline-blade.glb' },
+      { name: 'frame', file: './assets/kool-mandoline-frame.glb' },
+      { name: 'handguard', file: 'k./assets/ool-mandoline-handguard.glb' },
+      { name: 'handle', file: './assets/kool-mandoline-handletpe.glb' }
     ];
     
     for (const part of parts) {
