@@ -724,13 +724,13 @@ class App {
     this.scene.background = new THREE.Color(0xc0c0c1);
     this.createFloor(); // Add floor immediately
     this.rgbeLoader.load(
-      './assets/brown_photostudio_02_2k.hdr',
+      './assets/studio_small_09_1k.hdr',
       (texture) => {
         texture.mapping = THREE.EquirectangularReflectionMapping;
         this.scene.environment = texture;
         this.renderer.physicallyCorrectLights = true;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 0.4;
+        this.renderer.toneMappingExposure = 0.6;
         this.renderer.outputEncoding = THREE.sRGBEncoding;
       }
     );
