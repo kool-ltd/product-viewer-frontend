@@ -1,16 +1,16 @@
 {
   "models": [
     {
-      "name": "Secondz-New-Design-Round-S",
-      "url": "./assets/files/Secondz-New-Design-Round-S.glb"
+      "name": "Mega-Bowl-Mixing-Bowl",
+      "url": "./assets/files/kool-mega-bowl-bowl.glb"
     },
     {
-      "name": "Secondz-New-Design-Round-L",
-      "url": "./assets/files/Secondz-New-Design-Round-L.glb"
+      "name": "Mega-Bowl-Grater",
+      "url": "./assets/files/kool-mega-bowl-grater.glb"
     },
     {
-      "name": "Secondz-New-Design-Set-Round",
-      "url": "./assets/files/Secondz-New-Design-Set-Round.glb"
+      "name": "Mega-Bowl-Lid",
+      "url": "./assets/files/kool-mega-bowl-lid.glb"
     }
   ]
 }
