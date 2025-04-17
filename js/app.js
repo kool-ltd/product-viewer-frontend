@@ -1025,7 +1025,7 @@ class App {
         // Create a new floor with shadow material
         const floorGeometry = new THREE.PlaneGeometry(20, 20);
         const shadowMaterial = new THREE.ShadowMaterial({
-            opacity: 0.05 // Subtle shadows only
+            opacity: 0.07 // Subtle shadows only
         });
         
         this.floor = new THREE.Mesh(floorGeometry, shadowMaterial);
