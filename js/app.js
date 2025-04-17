@@ -476,10 +476,7 @@ class App {
         cancelButton.style.borderRadius = '9999px';
         cancelButton.style.padding = '10px 20px';
         cancelButton.style.cursor = 'pointer';
-
-
-
-        
+        cancelBtn.style.marginRight = '15px';
         buttonsDiv.appendChild(cancelButton);
         buttonsDiv.appendChild(loadButton);
         modalContainer.appendChild(buttonsDiv);
