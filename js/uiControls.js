@@ -233,7 +233,7 @@ function showMaterialColorPicker(app) {
   cancelBtn.style.borderRadius = '9999px';
   cancelBtn.style.padding = '8px 24px';
   cancelBtn.style.cursor = 'pointer';
-  
+  cancelBtn.style.marginRight = '15px';
   cancelBtn.addEventListener('click', () => {
     document.body.removeChild(overlay);
   });

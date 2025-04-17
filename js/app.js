@@ -235,6 +235,7 @@ class App {
     demoButton.style.borderRadius = '9999px';
     demoButton.style.padding = '10px 20px';
     demoButton.style.cursor = 'pointer';
+    demoButton.style.width = '100px'
     demoButton.addEventListener('click', () => {
       document.body.removeChild(overlay);
       this.showBrowseInterface();
@@ -248,6 +249,7 @@ class App {
     uploadButton.style.borderRadius = '9999px';
     uploadButton.style.padding = '10px 20px';
     uploadButton.style.cursor = 'pointer';
+    uploadButton.style.width = '100px'
     uploadButton.addEventListener('click', () => {
       document.body.removeChild(overlay);
       const fileInput = document.querySelector('input[type="file"][accept=".glb,.gltf"]');
