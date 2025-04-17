@@ -212,10 +212,11 @@ class App {
     box.style.borderRadius = '8px';
     // box.style.textAlign = 'center';
     box.style.width = '300px';
+    box.lineHeight = '24px'
 
     const title = document.createElement('h1');
     title.style.margin = '0 0 10px';
-    title.innerHTML = '<h5>3D Model Viewer</h5> <p style="font-size: 16px; font-weight: normal;">with AR</p>';
+    title.innerHTML = '<h5>3D Model Viewer</h5> <p style="font-size: 16px; font-weight: normal;">Beta</p>';
 
     const description = document.createElement('p');
     description.style.fontSize = '14px';
@@ -224,22 +225,18 @@ class App {
     description.innerHTML = `
       <h3 style="margin:7px 0px">Explore 3D Models with Ease</h3>
           <p> Click the "Browse" button to explore our demo models.</p>
-          <p> Use the "Open" button to load your own GLB files.</p>
-
-      <br>
+          <p> Click the "Open" button to load your GLB files.</p>
 
       <h3 style="margin:7px 0px">Interactive Features:</h3>
-          <p>Click the "Color" button to modify any recognized materials.</p>
           <p>Drag components to reposition them as you wish.</p>
           <p>Drag the screen to rotate around the model.</p>
+          <p>Click the "Color" button to modify any recognized materials.</p>
           <p>Click the "Reset" button to reset view and return all parts to their original positions.</p>
-      <br>
 
       <h3 style="margin:7px 0px">Augmented Reality:</h3>
       <p>If your device supports AR, simply click the "AR" button to view your model at real scale.</p>
-      <br>
 
-      <h3 style="margin:7px 0px">Enhancing Product Prototyping in the Virtual World.</h3>
+      <h3 style="margin:7px 0px">Enhancing Product Development in the Virtual World.</h3>
     `
     const buttonsContainer = document.createElement('div');
     buttonsContainer.style.display = 'flex';
