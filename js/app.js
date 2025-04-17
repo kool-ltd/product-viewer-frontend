@@ -1014,6 +1014,9 @@ class App {
       this.productGroup.visible = false;
     }
 
+    // Update the scene background to show the camera feed by setting it to null
+    this.scene.background = null;
+
     // Update floor for AR mode
     if (this.floor) {
         // Remove the old floor
