@@ -215,14 +215,32 @@ class App {
 
     const title = document.createElement('h1');
     title.style.margin = '0 0 10px';
-    title.innerHTML = '3D Model Viewer <span style="font-size: 16px; font-weight: normal;">with AR</span>';
+    title.innerHTML = '<h1>3D Model Viewer</h1> <p style="font-size: 16px; font-weight: normal;">with AR</p>';
 
     const description = document.createElement('p');
     description.style.fontSize = '14px';
     description.style.color = '#333';
     description.style.marginBottom = '20px';
-    description.innerHTML = '<p>Click the Upload button to load GLB/GLTF files or use the Demo option to see example models.</p><p>Experience interactive 3D models like never before!</p>';
-    
+    description.innerHTML = `
+      <h3>Explore 3D Models with Ease</h3>
+      <ul>
+          <li><span class="highlight">Browse Demo Models:</span> Click the "Browse" button to explore our demo models.</li>
+          <li><span class="highlight">Open Your Files:</span> Use the "Open" button to load your own GLB files.</li>
+      </ul>
+
+      <h3>Interactive Features:</h3>
+      <ul>
+          <li><span class="highlight">Change Colors:</span> Click the "Color" button to modify any recognized materials.</li>
+          <li><span class="highlight">Move Parts:</span> Drag components to reposition them as you wish.</li>
+          <li><span class="highlight">Orbit View:</span> Drag the screen to rotate around the model.</li>
+          <li><span class="highlight">Reset View:</span> Click the "Reset" button to return all parts to their original positions.</li>
+      </ul>
+
+      <h3>Augmented Reality:</h3>
+      <p>If your device supports AR, simply click the "AR" button to view your model at real scale.</p>
+
+      <h3>Enhancing Product Prototyping in the Virtual World.</h3>
+    `
     const buttonsContainer = document.createElement('div');
     buttonsContainer.style.display = 'flex';
     buttonsContainer.style.justifyContent = 'space-around';
