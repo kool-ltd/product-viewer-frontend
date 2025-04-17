@@ -434,7 +434,7 @@ class App {
         if (!files || files.length === 0) {
             description.textContent = 'No models found.';
         } else {
-            description.textContent = `Found ${files.length} models. Select models to load:`;
+            description.textContent = `Select models (multiple selections allowed): `;
         }
         modalContainer.appendChild(description);
         
