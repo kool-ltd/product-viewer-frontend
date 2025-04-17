@@ -122,7 +122,7 @@ class App {
     });
   
     // Instead of directly loading the default product, show the landing overlay.
-    // this.showLandingOverlay();
+    this.showLandingOverlay();
 
     this.animate();
   }
@@ -228,7 +228,7 @@ class App {
     buttonsContainer.style.justifyContent = 'space-around';
 
     const demoButton = document.createElement('button');
-    demoButton.textContent = 'Demo';
+    demoButton.textContent = 'Browse';
     demoButton.style.backgroundColor = '#d00024';
     demoButton.style.color = 'white';
     demoButton.style.border = 'none';
@@ -237,7 +237,7 @@ class App {
     demoButton.style.cursor = 'pointer';
     demoButton.addEventListener('click', () => {
       document.body.removeChild(overlay);
-      this.loadDefaultProduct();
+      this.showBrowseInterface();
     });
 
     const uploadButton = document.createElement('button');
