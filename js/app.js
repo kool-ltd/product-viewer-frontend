@@ -215,7 +215,7 @@ class App {
 
     const title = document.createElement('h1');
     title.style.margin = '0 0 10px';
-    title.innerHTML = '<h1>3D Model Viewer</h1> <p style="font-size: 16px; font-weight: normal;">with AR</p>';
+    title.innerHTML = '<h5>3D Model Viewer</h5> <p style="font-size: 16px; font-weight: normal;">with AR</p>';
 
     const description = document.createElement('p');
     description.style.fontSize = '14px';
@@ -224,20 +224,23 @@ class App {
     description.innerHTML = `
       <h3>Explore 3D Models with Ease</h3>
       <ul>
-          <li><span class="highlight">Browse Demo Models:</span> Click the "Browse" button to explore our demo models.</li>
-          <li><span class="highlight">Open Your Files:</span> Use the "Open" button to load your own GLB files.</li>
+          <li> Click the "Browse" button to explore our demo models.</li>
+          <li> Use the "Open" button to load your own GLB files.</li>
       </ul>
+      <br>
 
       <h3>Interactive Features:</h3>
       <ul>
-          <li><span class="highlight">Change Colors:</span> Click the "Color" button to modify any recognized materials.</li>
-          <li><span class="highlight">Move Parts:</span> Drag components to reposition them as you wish.</li>
-          <li><span class="highlight">Orbit View:</span> Drag the screen to rotate around the model.</li>
-          <li><span class="highlight">Reset View:</span> Click the "Reset" button to return all parts to their original positions.</li>
+          <li>Click the "Color" button to modify any recognized materials.</li>
+          <li>Drag components to reposition them as you wish.</li>
+          <li>Drag the screen to rotate around the model.</li>
+          <li>Click the "Reset" button to reset view and return all parts to their original positions.</li>
       </ul>
+      <br>
 
       <h3>Augmented Reality:</h3>
       <p>If your device supports AR, simply click the "AR" button to view your model at real scale.</p>
+      <br>
 
       <h3>Enhancing Product Prototyping in the Virtual World.</h3>
     `
