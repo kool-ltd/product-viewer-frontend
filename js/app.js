@@ -739,7 +739,7 @@ class App {
   setupLights() {
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     this.scene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.4);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
     directionalLight.position.set(-5, 30, 5);
     directionalLight.castShadow = true; // Enable shadow casting
     
