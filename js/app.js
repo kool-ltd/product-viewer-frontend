@@ -456,22 +456,27 @@ class App {
         
         const loadButton = document.createElement('button');
         loadButton.textContent = 'Load Selected';
-        loadButton.style.marginLeft = '10px';
-        loadButton.style.padding = '8px 16px';
-        loadButton.style.border = 'none';
-        loadButton.style.borderRadius = '4px';
-        loadButton.style.background = '#007bff';
+        loadButton.style.backgroundColor = '#d00024';
         loadButton.style.color = 'white';
+        loadButton.style.border = 'none';
+        loadButton.style.borderRadius = '9999px';
+        loadButton.style.padding = '10px 20px';
         loadButton.style.cursor = 'pointer';
+
+
+
         
         const cancelButton = document.createElement('button');
         cancelButton.textContent = 'Cancel';
-        cancelButton.style.padding = '8px 16px';
-        cancelButton.style.border = '1px solid #ddd';
-        cancelButton.style.borderRadius = '4px';
-        cancelButton.style.background = 'white';
+        cancelButton.style.backgroundColor = 'white';
         cancelButton.style.color = '#333';
+        cancelButton.style.border = 'none';
+        cancelButton.style.borderRadius = '9999px';
+        cancelButton.style.padding = '10px 20px';
         cancelButton.style.cursor = 'pointer';
+
+
+
         
         buttonsDiv.appendChild(cancelButton);
         buttonsDiv.appendChild(loadButton);
