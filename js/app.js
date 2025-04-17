@@ -730,7 +730,7 @@ class App {
         this.scene.environment = texture;
         this.renderer.physicallyCorrectLights = true;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 0.5;
+        this.renderer.toneMappingExposure = 0.4;
         this.renderer.outputEncoding = THREE.sRGBEncoding;
       }
     );
