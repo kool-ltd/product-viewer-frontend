@@ -210,7 +210,6 @@ class App {
     box.style.backgroundColor = 'white';
     box.style.padding = '30px';
     box.style.borderRadius = '8px';
-    box.style.textAlign = 'center';
     box.style.width = '300px';
 
     const title = document.createElement('h1');
