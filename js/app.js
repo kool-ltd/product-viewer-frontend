@@ -241,7 +241,7 @@ class App {
     });
 
     const uploadButton = document.createElement('button');
-    uploadButton.textContent = 'Upload';
+    uploadButton.textContent = 'Open';
     uploadButton.style.backgroundColor = '#d00024';
     uploadButton.style.color = 'white';
     uploadButton.style.border = 'none';
@@ -468,8 +468,8 @@ class App {
         
         const cancelButton = document.createElement('button');
         cancelButton.textContent = 'Cancel';
-        cancelButton.style.backgroundColor = 'white';
-        cancelButton.style.color = '#333';
+        cancelButton.style.backgroundColor = 'rgb(153, 153, 153)';
+        cancelButton.style.color = 'white';
         cancelButton.style.border = 'none';
         cancelButton.style.borderRadius = '9999px';
         cancelButton.style.padding = '10px 20px';

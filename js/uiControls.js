@@ -376,9 +376,9 @@ export function setupUIControls(app) {
   // ------------------------------
   const uploadButton = document.createElement('button');
   if (useCompactUI) {
-    updateButtonForCompactUI(uploadButton, "fa-solid fa-file-arrow-up", "Upload Model");
+    updateButtonForCompactUI(uploadButton, "fa-solid fa-file-arrow-up", "Open Model");
   } else {
-    uploadButton.textContent = 'Upload';
+    uploadButton.textContent = 'Open';
   }
   uploadButton.style.padding = useCompactUI ? '25px' : '8px 24px';
   uploadButton.style.border = 'none';
