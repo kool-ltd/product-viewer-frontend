@@ -210,6 +210,7 @@ class App {
     box.style.backgroundColor = 'white';
     box.style.padding = '30px';
     box.style.borderRadius = '8px';
+    // box.style.textAlign = 'center';
     box.style.width = '300px';
 
     const title = document.createElement('h1');
@@ -221,27 +222,24 @@ class App {
     description.style.color = '#333';
     description.style.marginBottom = '20px';
     description.innerHTML = `
-      <h3>Explore 3D Models with Ease</h3>
-      <ul>
-          <li> Click the "Browse" button to explore our demo models.</li>
-          <li> Use the "Open" button to load your own GLB files.</li>
-      </ul>
+      <h3 style="margin:7px 0px">Explore 3D Models with Ease</h3>
+          <p> Click the "Browse" button to explore our demo models.</p>
+          <p> Use the "Open" button to load your own GLB files.</p>
+
       <br>
 
-      <h3>Interactive Features:</h3>
-      <ul>
-          <li>Click the "Color" button to modify any recognized materials.</li>
-          <li>Drag components to reposition them as you wish.</li>
-          <li>Drag the screen to rotate around the model.</li>
-          <li>Click the "Reset" button to reset view and return all parts to their original positions.</li>
-      </ul>
+      <h3 style="margin:7px 0px">Interactive Features:</h3>
+          <p>Click the "Color" button to modify any recognized materials.</p>
+          <p>Drag components to reposition them as you wish.</p>
+          <p>Drag the screen to rotate around the model.</p>
+          <p>Click the "Reset" button to reset view and return all parts to their original positions.</p>
       <br>
 
-      <h3>Augmented Reality:</h3>
+      <h3 style="margin:7px 0px">Augmented Reality:</h3>
       <p>If your device supports AR, simply click the "AR" button to view your model at real scale.</p>
       <br>
 
-      <h3>Enhancing Product Prototyping in the Virtual World.</h3>
+      <h3 style="margin:7px 0px">Enhancing Product Prototyping in the Virtual World.</h3>
     `
     const buttonsContainer = document.createElement('div');
     buttonsContainer.style.display = 'flex';
