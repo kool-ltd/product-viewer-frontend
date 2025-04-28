@@ -258,7 +258,7 @@ class App {
 
     const uploadButton = document.createElement('button');
     uploadButton.textContent = 'Open';
-    uploadButton.style.backgroundColor = '#d00024';
+    uploadButton.style.backgroundColor = '#999999';
     uploadButton.style.color = 'white';
     uploadButton.style.border = 'none';
     uploadButton.style.borderRadius = '9999px';
