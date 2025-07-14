@@ -2,15 +2,7 @@
   "models": [
     {
       "name": "Mega-Bowl-Mixing-Bowl",
-      "url": "./assets/files/kool-mega-bowl-bowl.glb"
-    },
-    {
-      "name": "Mega-Bowl-Grater",
-      "url": "./assets/files/kool-mega-bowl-grater.glb"
-    },
-    {
-      "name": "Mega-Bowl-Lid",
-      "url": "./assets/files/kool-mega-bowl-lid.glb"
+      "url": "./assets/files/20250714 NPD Lotus-coffee-dripper-3.glb"
     }
   ]
 }
