@@ -58,13 +58,13 @@ function createColorButton(app) {
     colorButton.style.backgroundColor = '#b0001d';
   });
   colorButton.addEventListener('mouseout', () => {
-    colorButton.style.backgroundColor = app.colorMode ? '#00ff00' : '#d00024';
+    colorButton.style.backgroundColor = app.colorMode ? '#008000' : '#d00024';
   });
   
   colorButton.addEventListener('click', () => {
     app.colorMode = !app.colorMode;
     if (app.colorMode) {
-      colorButton.style.backgroundColor = '#00ff00';
+      colorButton.style.backgroundColor = '#008000';
       showConfirmationModal('Click on a part to change its color.');
     } else {
       colorButton.style.backgroundColor = '#d00024';
@@ -217,15 +217,23 @@ export function setupUIControls(app) {
   // Optional: AR and VR Buttons (if supported).
   // ------------------------------
   if ('xr' in navigator) {
-    const arButton = ARButton.createButton(app.renderer, {
-      requiredFeatures: ['hit-test'],
-      optionalFeatures: ['dom-overlay'],
-      domOverlay: { root: document.body }
+    navigator.xr.isSessionSupported('immersive-ar').then(supported => {
+      if (supported) {
+        const arButton = ARButton.createButton(app.renderer, {
+          requiredFeatures: ['hit-test'],
+          optionalFeatures: ['dom-overlay'],
+          domOverlay: { root: document.body }
+        });
+        controlsContainer.appendChild(arButton);
+      }
     });
-    controlsContainer.appendChild(arButton);
 
-    const vrButton = VRButton.createButton(app.renderer);
-    controlsContainer.appendChild(vrButton);
+    navigator.xr.isSessionSupported('immersive-vr').then(supported => {
+      if (supported) {
+        const vrButton = VRButton.createButton(app.renderer);
+        controlsContainer.appendChild(vrButton);
+      }
+    });
   }
   
   document.body.appendChild(controlsContainer);
