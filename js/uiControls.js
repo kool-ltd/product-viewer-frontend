@@ -1,136 +1,232 @@
+// uiControls.js
+
 import * as THREE from 'three';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
+import { VRButton } from 'three/addons/webxr/VRButton.js';
 import { showConfirmationModal } from './modalManager.js';
 
-function isCompact() {
-  return /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent) || window.innerWidth < 768;
+// Function to detect if we should use compact UI with icons
+function shouldUseCompactUI() {
+  // Check if it's a mobile device
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  // Check if window is small (less than 768px width)
+  const isSmallWindow = window.innerWidth < 768;
+  
+  return isMobile || isSmallWindow;
+}
+// Function to update button styles for compact UI
+function updateButtonForCompactUI(button, iconClass, tooltip) {
+  // Clear existing content and add icon
+  button.innerHTML = `<i class="${iconClass}"></i>`;
+  button.title = tooltip; // Add tooltip for accessibility
+  
+  // Make button more compact
+  button.style.fontSize = 'larger';
+  button.style.padding = '20px';
+  button.style.minWidth = 'unset';
+  button.style.width = '42px';
+  button.style.height = '42px';
+  button.style.display = 'flex';
+  button.style.alignItems = 'center';
+  button.style.justifyContent = 'center';
 }
 
-function iconBtn(icon, title) {
-  const b = document.createElement('button');
-  b.innerHTML = `<i class="${icon}"></i>`;
-  b.title = title;
-  b.style.cssText = 'width:42px;height:42px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;padding:0;border:none;border-radius:9999px;background:#d00024;color:white;cursor:pointer;';
-  return b;
-}
-
-function textBtn(text) {
-  const b = document.createElement('button');
-  b.textContent = text;
-  b.style.cssText = 'padding:8px 24px;border:none;border-radius:9999px;background:#d00024;color:white;cursor:pointer;';
-  return b;
-}
-
-export function showMaterialColorPicker(app) {
-  if (!app.selectedMaterial) { alert('Tap a part first.'); return; }
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:20000;';
-  const modal = document.createElement('div');
-  modal.style.cssText = 'background:white;padding:20px;border-radius:8px;width:320px;';
-
-  const title = document.createElement('h3'); title.textContent = 'Edit Colour'; title.style.margin = '0 0 15px';
-  const picker = document.createElement('input'); picker.type = 'color';
-  picker.value = '#' + app.selectedMaterial.color.getHexString();
-  picker.style.cssText = 'width:100%;height:50px;margin-bottom:15px;';
-  picker.addEventListener('input', () => app.selectedMaterial.color.set(picker.value));
-
-  const recentDiv = document.createElement('div');
-  recentDiv.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:15px;';
-  const orig = app.selectedMaterial.userData.originalColor;
-  if (orig) {
-    const ob = document.createElement('button');
-    ob.style.cssText = 'width:30px;height:30px;background:'+orig+';border:1px solid #ccc;border-radius:4px;';
-    ob.onclick = () => picker.value = orig;
-    recentDiv.appendChild(ob);
+// Create color button
+function createColorButton(app) {
+  const colorButton = document.createElement('button');
+  
+  // Check if we should use compact UI
+  const useCompactUI = shouldUseCompactUI();
+  
+  if (useCompactUI) {
+    updateButtonForCompactUI(colorButton, "fa-solid fa-palette", "Change Color");
+  } else {
+    colorButton.textContent = 'Color';
   }
-  JSON.parse(localStorage.getItem('recentColors')||'[]').forEach(c => {
-    const rb = document.createElement('button');
-    rb.style.cssText = 'width:30px;height:30px;background:'+c+';border:1px solid #ccc;border-radius:4px;';
-    rb.onclick = () => picker.value = c;
-    recentDiv.appendChild(rb);
+  
+  colorButton.style.padding = useCompactUI ? '25px' : '8px 24px';
+  colorButton.style.border = 'none';
+  colorButton.style.outline = 'none';
+  colorButton.style.borderRadius = '9999px';
+  colorButton.style.backgroundColor = '#d00024';
+  colorButton.style.color = 'white';
+  colorButton.style.cursor = 'pointer';
+  colorButton.style.transition = 'background-color 0.3s ease, color 0.3s ease';
+  
+  colorButton.addEventListener('mouseover', () => {
+    colorButton.style.backgroundColor = '#b0001d';
+  });
+  colorButton.addEventListener('mouseout', () => {
+    colorButton.style.backgroundColor = app.colorMode ? '#00ff00' : '#d00024';
+  });
+  
+  colorButton.addEventListener('click', () => {
+    app.colorMode = !app.colorMode;
+    if (app.colorMode) {
+      colorButton.style.backgroundColor = '#00ff00';
+      showConfirmationModal('Click on a part to change its color.');
+    } else {
+      colorButton.style.backgroundColor = '#d00024';
+    }
+  });
+  
+  return colorButton;
+}
+
+// Create the UI controls and attach them to the app.
+export function setupUIControls(app) {
+  // Determine if we should use compact UI (icons instead of text)
+  const useCompactUI = shouldUseCompactUI();
+
+  // Create a container for the controls.
+  const controlsContainer = document.createElement('div');
+  controlsContainer.style.position = 'fixed';
+  controlsContainer.style.top = '10px';
+  controlsContainer.style.left = '10px';
+  controlsContainer.style.zIndex = '1000';
+  controlsContainer.style.display = 'flex';
+  controlsContainer.style.alignItems = 'center';
+  controlsContainer.style.gap = useCompactUI ? '5px' : '10px';
+
+  // ------------------------------
+  // Create the Upload button.
+  // ------------------------------
+  const uploadButton = document.createElement('button');
+  if (useCompactUI) {
+    updateButtonForCompactUI(uploadButton, "fa-solid fa-file-arrow-up", "Open Model");
+  } else {
+    uploadButton.textContent = 'Open';
+  }
+  uploadButton.style.padding = useCompactUI ? '25px' : '8px 24px';
+  uploadButton.style.border = 'none';
+  uploadButton.style.outline = 'none';
+  uploadButton.style.borderRadius = '9999px';
+  uploadButton.style.backgroundColor = '#d00024';
+  uploadButton.style.color = 'white';
+  uploadButton.style.cursor = 'pointer';
+  uploadButton.style.transition = 'background-color 0.3s ease, color 0.3s ease';
+  
+  uploadButton.addEventListener('mouseover', () => {
+    uploadButton.style.backgroundColor = '#b0001d';
+  });
+  uploadButton.addEventListener('mouseout', () => {
+    uploadButton.style.backgroundColor = '#d00024';
+  });
+  
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = '.glb,.gltf';
+  fileInput.style.display = 'none';
+  fileInput.multiple = true;
+  
+  uploadButton.onclick = () => fileInput.click();
+  
+  // ------------------------------
+  // Create the Browse button.
+  // ------------------------------
+  const browseButton = document.createElement('button');
+  if (useCompactUI) {
+    updateButtonForCompactUI(browseButton, "fa-solid fa-folder-open", "Browse Models");
+  } else {
+    browseButton.textContent = 'Browse';
+  }
+  browseButton.style.padding = useCompactUI ? '25px' : '8px 24px';
+  browseButton.style.border = 'none';
+  browseButton.style.outline = 'none';
+  browseButton.style.borderRadius = '9999px';
+  browseButton.style.backgroundColor = '#d00024';
+  browseButton.style.color = 'white';
+  browseButton.style.cursor = 'pointer';
+  browseButton.style.transition = 'background-color 0.3s ease, color 0.3s ease';
+
+  browseButton.addEventListener('mouseover', () => {
+    browseButton.style.backgroundColor = '#b0001d';
+  });
+  browseButton.addEventListener('mouseout', () => {
+    browseButton.style.backgroundColor = '#d00024';
   });
 
-  const btns = document.createElement('div');
-  btns.style.cssText = 'display:flex;justify-content:space-between;';
-  const cancel = document.createElement('button');
-  cancel.textContent = 'Cancel'; cancel.style.cssText = 'background:#999;color:white;border:none;border-radius:9999px;padding:8px 20px;';
-  cancel.onclick = () => {
-    app.selectedMaterial.color.set(app.selectedMaterial.userData.originalColor || '#ffffff');
-    app.selectedMaterial.emissive.copy(app.selectedMaterial.userData._tempEmissive);
-    document.body.removeChild(overlay);
-    app.selectedMaterial = null;
-  };
-  const apply = document.createElement('button');
-  apply.textContent = 'Apply'; apply.style.cssText = 'background:#d00024;color:white;border:none;border-radius:9999px;padding:8px 20px;';
-  apply.onclick = () => {
-    const arr = JSON.parse(localStorage.getItem('recentColors')||'[]').filter(x=>x!==picker.value);
-    arr.unshift(picker.value); localStorage.setItem('recentColors', JSON.stringify(arr.slice(0,6)));
-    app.selectedMaterial.userData.originalColor = picker.value;
-    app.selectedMaterial.emissive.copy(app.selectedMaterial.userData._tempEmissive);
-    document.body.removeChild(overlay);
-    app.selectedMaterial = null;
-  };
-  btns.append(cancel, apply);
-  modal.append(title, picker, document.createElement('h4').appendChild(document.createTextNode('Recent')), recentDiv, btns);
-  overlay.appendChild(modal);
-  document.body.appendChild(overlay);
-}
-
-function createColorButton(app) {
-  const compact = isCompact();
-  const btn = compact ? iconBtn('fa-solid fa-palette', 'Select part to colour') : textBtn('Colour');
-  btn.onclick = () => {
-    app.selectionMode = !app.selectionMode;
-    if (compact) {
-      btn.innerHTML = app.selectionMode ? '<i class="fa-solid fa-ban"></i>' : '<i class="fa-solid fa-palette"></i>';
-      btn.title = app.selectionMode ? 'Cancel' : 'Select part to colour';
+  // When clicked, trigger the function that shows the browse interface.
+  browseButton.addEventListener('click', () => {
+    // Assume app.showBrowseInterface is defined (as in our modified app.js)
+    if (app.showBrowseInterface) {
+      app.showBrowseInterface();
     } else {
-      btn.textContent = app.selectionMode ? 'Cancel' : 'Colour';
+      console.log("Browse interface is not available.");
     }
-    if (app.selectionMode) showConfirmationModal('Tap a part to change its colour.');
-  };
-  return btn;
-}
-
-export function setupUIControls(app) {
-  const compact = isCompact();
-  const container = document.createElement('div');
-  container.style.cssText = 'position:fixed;top:10px;left:10px;z-index:1000;display:flex;gap:'+(compact?'5px':'10px')+';align-items:center;';
-
-  const uploadBtn = compact ? iconBtn('fa-solid fa-file-arrow-up', 'Open model') : textBtn('Open');
-  const fileInput = document.createElement('input');
-  fileInput.type = 'file'; fileInput.accept = '.glb,.gltf'; fileInput.multiple = true; fileInput.style.display = 'none';
-  uploadBtn.onclick = () => fileInput.click();
-  container.appendChild(fileInput);
-  container.appendChild(uploadBtn);
-
-  const browseBtn = compact ? iconBtn('fa-solid fa-folder-open', 'Browse demos') : textBtn('Browse');
-  browseBtn.onclick = () => app.showBrowseInterface();
-  container.appendChild(browseBtn);
-
-  container.appendChild(createColorButton(app));
-
-  const resetBtn = compact ? iconBtn('fa-solid fa-arrows-rotate', 'Reset') : textBtn('Reset');
-  resetBtn.onclick = () => {
+  });
+  
+  // ------------------------------
+  // Create the Color button
+  // ------------------------------
+  const colorButton = createColorButton(app);
+  
+  // ------------------------------
+  // Create a Reset button.
+  // ------------------------------
+  const resetButton = document.createElement('button');
+  if (useCompactUI) {
+    updateButtonForCompactUI(resetButton, "fa-solid fa-arrows-rotate", "Reset Model");
+  } else {
+    resetButton.textContent = 'Reset';
+  }
+  resetButton.style.padding = useCompactUI ? '25px' : '8px 24px';
+  resetButton.style.border = 'none';
+  resetButton.style.outline = 'none';
+  resetButton.style.borderRadius = '9999px';
+  resetButton.style.backgroundColor = '#d00024';
+  resetButton.style.color = 'white';
+  resetButton.style.cursor = 'pointer';
+  resetButton.style.transition = 'background-color 0.3s ease, color 0.3s ease';
+  
+  resetButton.addEventListener('mouseover', () => {
+    resetButton.style.backgroundColor = '#b0001d';
+  });
+  resetButton.addEventListener('mouseout', () => {
+    resetButton.style.backgroundColor = '#d00024';
+  });
+  
+  resetButton.onclick = () => {
+    // Reset the transformation (position, rotation, and scale) of all parts.
     if (app.productGroup) {
-      app.productGroup.traverse(c => { c.position.set(0,0,0); c.rotation.set(0,0,0); c.scale.set(1,1,1); });
-    }
-    app.fitCameraToScene();
-  };
-  container.appendChild(resetBtn);
-
-  if ('xr' in navigator) {
-    navigator.xr.isSessionSupported('immersive-ar').then(ar => {
-      navigator.xr.isSessionSupported('immersive-vr').then(vr => {
-        if (ar || vr) {
-          const xrBtn = ARButton.createButton(app.renderer, { optionalFeatures: ['local-floor','bounded-floor','hand-tracking'] });
-          xrBtn.style.marginLeft = '8px';
-          xrBtn.textContent = 'Enter XR';
-          container.appendChild(xrBtn);
+      app.productGroup.children.forEach((child) => {
+        child.position.set(0, 0, 0);
+        child.rotation.set(0, 0, 0);
+        // Reset to the stored original scale or default to (1, 1, 1)
+        if (child.children.length > 0 && child.children[0].userData.originalScale) {
+          child.scale.copy(child.children[0].userData.originalScale);
+        } else {
+          child.scale.set(1, 1, 1);
         }
       });
-    });
-  }
+    }
+    // Reset the camera/viewport to its initial state.
+    if (typeof app.fitCameraToScene === 'function') {
+      app.fitCameraToScene();
+    }
+  };
+  
+  controlsContainer.appendChild(fileInput);
+  controlsContainer.appendChild(uploadButton);
+  controlsContainer.appendChild(browseButton);
+  controlsContainer.appendChild(colorButton);
+  controlsContainer.appendChild(resetButton);
 
-  document.body.appendChild(container);
+  // ------------------------------
+  // Optional: AR and VR Buttons (if supported).
+  // ------------------------------
+  if ('xr' in navigator) {
+    const arButton = ARButton.createButton(app.renderer, {
+      requiredFeatures: ['hit-test'],
+      optionalFeatures: ['dom-overlay'],
+      domOverlay: { root: document.body }
+    });
+    controlsContainer.appendChild(arButton);
+
+    const vrButton = VRButton.createButton(app.renderer);
+    controlsContainer.appendChild(vrButton);
+  }
+  
+  document.body.appendChild(controlsContainer);
 }
