@@ -1,8 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
-import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
-import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { InteractionManager } from './InteractionManager.js';
 import { setupUIControls } from './uiControls.js';
@@ -10,7 +8,6 @@ import { showConfirmationModal } from './modalManager.js';
 
 class App {
   constructor() {
-    // ----- Core state -----
     this.loadedModels = new Map();
     this.draggableObjects = [];
     this.isARMode = false;
@@ -22,24 +19,15 @@ class App {
     this.mouse = new THREE.Vector2();
     this.raycaster = new THREE.Raycaster();
 
-    // AR/VR UI
     this.placementReticle = null;
     this.placementMessage = null;
     this.placeAgainButton = null;
     this.exitXRButton = null;
     this.hitTestSource = null;
 
-    // Touch fallback
-    this.touchStartX = null;
-    this.touchStartY = null;
-
-    // FontAwesome
     this.ensureFontAwesomeLoaded();
-
-    // Loading overlay
     this.createLoadingOverlay();
 
-    // Loaders
     this.loadingManager = new THREE.LoadingManager();
     this.loadingManager.onProgress = (url, loaded, total) => {
       const fill = document.querySelector('#loading-overlay .progress-fill');
@@ -51,64 +39,45 @@ class App {
     };
 
     this.gltfLoader = new GLTFLoader(this.loadingManager);
-    this.rgbeLoader = new RGBELoader(this.loadingManager);
 
-    // Initialize scene
     this.init();
-    this.setupScene();        // FIXED: Added
+    this.setupScene();
     this.setupLights();
     this.setupInitialControls();
 
-    // UI
     setupUIControls(this);
 
-    // File input
     const fileInput = document.querySelector('input[type="file"][accept=".glb,.gltf"]');
     if (fileInput) {
-      fileInput.onchange = async (event) => {
+      fileInput.onchange = async (e) => {
         const overlay = document.getElementById('loading-overlay');
         if (overlay) overlay.style.display = 'flex';
-
-        const files = event.target.files;
-        if (!files || files.length === 0) {
-          if (overlay) overlay.style.display = 'none';
-          return;
-        }
-
+        const files = e.target.files;
+        if (!files?.length) { overlay.style.display = 'none'; return; }
         this.clearExistingModels();
-
-        for (let file of files) {
-          try {
-            const url = URL.createObjectURL(file);
-            const name = file.name.replace(/\.glb$|\.gltf$/i, '');
-            await this.loadModel(url, name);
-          } catch (e) { console.error(e); }
+        for (let f of files) {
+          const url = URL.createObjectURL(f);
+          const name = f.name.replace(/\.glb$|\.gltf$/i, '');
+          await this.loadModel(url, name);
         }
         if (overlay) overlay.style.display = 'none';
       };
     }
 
-    // Interaction
     this.interactionManager = new InteractionManager(
       this.scene, this.camera, this.renderer, this.renderer.domElement
     );
     window.app = this;
 
-    // Tap-to-select
     this.renderer.domElement.addEventListener('click', this.onPointerSelect.bind(this));
 
-    // XR events
     this.renderer.xr.addEventListener('sessionstart', this.onXRSessionStart.bind(this));
     this.renderer.xr.addEventListener('sessionend', this.onXRSessionEnd.bind(this));
 
-    // Start
     this.showLandingOverlay();
     this.animate();
   }
 
-  // -------------------------------------------------------------------------
-  // Core Setup
-  // -------------------------------------------------------------------------
   ensureFontAwesomeLoaded() {
     if (!document.querySelector('link[href*="font-awesome"]')) {
       const link = document.createElement('link');
@@ -132,7 +101,6 @@ class App {
     overlay.style.color = 'white';
     overlay.style.fontSize = '1.2rem';
     overlay.style.zIndex = '20000';
-
     overlay.innerHTML = `
       <div>Loading model...</div>
       <div class="progress-bar" style="width:250px;height:12px;background:#555;border-radius:6px;margin-top:12px;">
@@ -179,7 +147,6 @@ class App {
   setupLights() {
     const ambient = new THREE.AmbientLight(0xffffff, 0.6);
     this.scene.add(ambient);
-
     const dirLight = new THREE.DirectionalLight(0xffffff, 1);
     dirLight.position.set(5, 10, 7);
     dirLight.castShadow = true;
@@ -192,9 +159,6 @@ class App {
     this.orbitControls.dampingFactor = 0.05;
   }
 
-  // -------------------------------------------------------------------------
-  // Model Loading
-  // -------------------------------------------------------------------------
   async loadModel(url, name) {
     return new Promise((resolve, reject) => {
       this.gltfLoader.load(
@@ -202,7 +166,6 @@ class App {
         (gltf) => {
           const model = gltf.scene;
           model.name = name;
-
           model.traverse(child => {
             if (child.isMesh && !child.material.userData.originalColor) {
               child.material.userData.originalColor = '#' + child.material.color.getHexString();
@@ -212,12 +175,12 @@ class App {
           const container = new THREE.Group();
           container.name = name;
           container.add(model);
-          container.userData.originalScale = new THREE.Vector3(1, 1, 1);
+          container.userData.originalScale = new THREE.Vector3(1,1,1);
 
-          container.raycast = function (raycaster, intersects) {
+          container.raycast = function(raycaster, intersects) {
             const temp = [];
-            this.children.forEach(child => {
-              child.traverse(obj => {
+            this.children.forEach(c => {
+              c.traverse(obj => {
                 if (obj.isMesh) {
                   const old = obj.matrixAutoUpdate;
                   obj.matrixAutoUpdate = true;
@@ -228,11 +191,7 @@ class App {
               });
             });
             if (temp.length) {
-              intersects.push({
-                distance: temp[0].distance,
-                point: temp[0].point.clone(),
-                object: this
-              });
+              intersects.push({ distance: temp[0].distance, point: temp[0].point.clone(), object: this });
             }
           };
 
@@ -240,11 +199,7 @@ class App {
           this.productGroup = container;
           this.scene.add(container);
           this.loadedModels.set(name, container);
-
-          if (this.interactionManager) {
-            this.interactionManager.setDraggableObjects(Array.from(this.loadedModels.values()));
-          }
-
+          this.interactionManager.setDraggableObjects(Array.from(this.loadedModels.values()));
           this.fitCameraToScene();
           resolve(container);
         },
@@ -255,13 +210,11 @@ class App {
   }
 
   clearExistingModels() {
-    if (this.productGroup) {
-      this.scene.remove(this.productGroup);
-      this.productGroup = null;
-    }
+    if (this.productGroup) this.scene.remove(this.productGroup);
+    this.productGroup = null;
     this.loadedModels.clear();
     this.draggableObjects = [];
-    if (this.interactionManager) this.interactionManager.setDraggableObjects([]);
+    this.interactionManager.setDraggableObjects([]);
   }
 
   fitCameraToScene() {
@@ -271,19 +224,13 @@ class App {
     const center = box.getCenter(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z);
     const distance = maxDim * 2.5;
-    const direction = new THREE.Vector3()
-      .subVectors(this.camera.position, center)
-      .normalize()
-      .multiplyScalar(distance);
-
-    this.camera.position.copy(center).add(direction);
+    const dir = new THREE.Vector3().subVectors(this.camera.position, center).normalize().multiplyScalar(distance);
+    this.camera.position.copy(center).add(dir);
     this.orbitControls.target.copy(center);
     this.orbitControls.update();
   }
 
-  // -------------------------------------------------------------------------
-  // Tap-to-Select Color
-  // -------------------------------------------------------------------------
+  // Tap-to-select
   onPointerSelect(event) {
     if (!this.selectionMode) return;
     event.preventDefault();
@@ -297,23 +244,18 @@ class App {
     if (hits.length && hits[0].object.isMesh && hits[0].object.material) {
       const mat = hits[0].object.material;
       this.selectedMaterial = mat;
-
       mat.userData._tempEmissive = mat.emissive.clone();
       mat.emissive.set(0x555555);
-
-      import('./uiControls.js').then(mod => mod.showMaterialColorPicker(this));
+      import('./uiControls.js').then(m => m.showMaterialColorPicker(this));
     }
   }
 
-  // -------------------------------------------------------------------------
-  // XR Session Handling
-  // -------------------------------------------------------------------------
+  // XR
   onXRSessionStart() {
-    const session = this.renderer.xr.getSession();
+    const s = this.renderer.xr.getSession();
     this.isXRMode = true;
-    this.isARMode = session.mode === 'immersive-ar';
-    this.isVRMode = session.mode === 'immersive-vr';
-
+    this.isARMode = s.mode === 'immersive-ar';
+    this.isVRMode = s.mode === 'immersive-vr';
     this.scene.background = null;
 
     if (this.isARMode) {
@@ -330,27 +272,22 @@ class App {
     this.exitXRButton.textContent = this.isARMode ? 'Exit AR' : 'Exit VR';
 
     if (this.isARMode && !this.hitTestSource) {
-      session.requestReferenceSpace('local-floor')
-        .catch(() => session.requestReferenceSpace('viewer'))
-        .then(refSpace => session.requestHitTestSource({ space: refSpace }))
+      s.requestReferenceSpace('local-floor')
+        .catch(() => s.requestReferenceSpace('viewer'))
+        .then(rs => s.requestHitTestSource({ space: rs }))
         .then(src => this.hitTestSource = src);
     }
 
     if (this.isARMode) {
       this._selectBound = this.onSelectEvent.bind(this);
-      session.addEventListener('select', this._selectBound);
+      s.addEventListener('select', this._selectBound);
     }
   }
 
   onXRSessionEnd() {
-    this.isXRMode = false;
-    this.isARMode = false;
-    this.isVRMode = false;
-    this.isPlacingProduct = false;
-
+    this.isXRMode = this.isARMode = this.isVRMode = this.isPlacingProduct = false;
     this.scene.background = new THREE.Color(0xc0c0c1);
     this.renderer.setClearColor(0xc0c0c1, 1);
-
     if (this.productGroup) this.productGroup.visible = true;
     if (this.floor) this.floor.visible = false;
     if (this.placementReticle) this.placementReticle.visible = false;
@@ -359,25 +296,18 @@ class App {
     if (this.rotateLeftBtn) this.rotateLeftBtn.style.display = 'none';
     if (this.rotateRightBtn) this.rotateRightBtn.style.display = 'none';
     if (this.exitXRButton) this.exitXRButton.style.display = 'none';
-
     this.fitCameraToScene();
     this.orbitControls.enabled = true;
   }
 
   createExitXRButton() {
     this.exitXRButton = document.createElement('button');
-    this.exitXRButton.style.position = 'absolute';
-    this.exitXRButton.style.top = '20px';
-    this.exitXRButton.style.right = '20px';
-    this.exitXRButton.style.padding = '8px 16px';
-    this.exitXRButton.style.border = 'none';
-    this.exitXRButton.style.borderRadius = '4px';
-    this.exitXRButton.style.background = '#fff';
-    this.exitXRButton.style.color = '#000';
-    this.exitXRButton.style.fontSize = '13px';
-    this.exitXRButton.style.cursor = 'pointer';
-    this.exitXRButton.style.zIndex = '10000';
-    this.exitXRButton.style.display = 'none';
+    Object.assign(this.exitXRButton.style, {
+      position: 'absolute', top: '20px', right: '20px',
+      padding: '8px 16px', border: 'none', borderRadius: '4px',
+      background: '#fff', color: '#000', fontSize: '13px',
+      cursor: 'pointer', zIndex: '10000', display: 'none'
+    });
     this.exitXRButton.onclick = () => {
       const s = this.renderer.xr.getSession();
       if (s) s.end();
@@ -385,57 +315,35 @@ class App {
     document.body.appendChild(this.exitXRButton);
   }
 
-  // -------------------------------------------------------------------------
   // AR UI
-  // -------------------------------------------------------------------------
   createPlacementUI() {
-    // Reticle
     this.placementReticle = new THREE.Group();
-    this.placementReticle.scale.set(0.3, 0.3, 0.3);
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(0.15, 0.2, 32),
-      new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide })
-    );
-    ring.rotation.x = -Math.PI / 2;
+    this.placementReticle.scale.set(0.3,0.3,0.3);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.15,0.2,32), new THREE.MeshBasicMaterial({color:0xff0000,side:THREE.DoubleSide}));
+    ring.rotation.x = -Math.PI/2;
     this.placementReticle.add(ring);
-    const dot = new THREE.Mesh(
-      new THREE.CircleGeometry(0.05, 32),
-      new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide })
-    );
-    dot.rotation.x = -Math.PI / 2;
+    const dot = new THREE.Mesh(new THREE.CircleGeometry(0.05,32), new THREE.MeshBasicMaterial({color:0xff0000,side:THREE.DoubleSide}));
+    dot.rotation.x = -Math.PI/2;
     this.placementReticle.add(dot);
     this.placementReticle.visible = false;
     this.scene.add(this.placementReticle);
 
-    // Message
     this.placementMessage = document.createElement('div');
+    Object.assign(this.placementMessage.style, {
+      position:'absolute', bottom:'100px', left:'50%', transform:'translateX(-50%)',
+      color:'white', fontSize:'20px', zIndex:'10000', display:'none'
+    });
     this.placementMessage.textContent = 'Tap to place';
-    this.placementMessage.style.position = 'absolute';
-    this.placementMessage.style.bottom = '100px';
-    this.placementMessage.style.left = '50%';
-    this.placementMessage.style.transform = 'translateX(-50%)';
-    this.placementMessage.style.color = 'white';
-    this.placementMessage.style.fontSize = '20px';
-    this.placementMessage.style.zIndex = '10000';
-    this.placementMessage.style.display = 'none';
     document.body.appendChild(this.placementMessage);
 
-    // Place again
     this.placeAgainButton = document.createElement('button');
+    Object.assign(this.placeAgainButton.style, {
+      position:'absolute', bottom:'80px', left:'50%', transform:'translateX(-50%)',
+      padding:'8px 16px', border:'none', borderRadius:'4px',
+      background:'#fff', color:'#000', fontSize:'13px', cursor:'pointer',
+      zIndex:'10000', display:'none'
+    });
     this.placeAgainButton.textContent = 'Place Again';
-    this.placeAgainButton.style.position = 'absolute';
-    this.placeAgainButton.style.bottom = '80px';
-    this.placeAgainButton.style.left = '50%';
-    this.placeAgainButton.style.transform = 'translateX(-50%)';
-    this.placeAgainButton.style.padding = '8px 16px';
-    this.placeAgainButton.style.border = 'none';
-    this.placeAgainButton.style.borderRadius = '4px';
-    this.placeAgainButton.style.background = '#fff';
-    this.placeAgainButton.style.color = '#000';
-    this.placeAgainButton.style.fontSize = '13px';
-    this.placeAgainButton.style.cursor = 'pointer';
-    this.placeAgainButton.style.zIndex = '10000';
-    this.placeAgainButton.style.display = 'none';
     this.placeAgainButton.onclick = () => {
       if (this.productGroup) this.productGroup.visible = false;
       this.isPlacingProduct = true;
@@ -451,42 +359,29 @@ class App {
     };
     document.body.appendChild(this.placeAgainButton);
 
-    // Rotation buttons
     this.createARRotationControls();
   }
 
   createARRotationControls() {
     this.rotateLeftBtn = document.createElement('button');
     this.rotateLeftBtn.innerHTML = '<i class="fa-solid fa-rotate-left"></i>';
-    this.rotateLeftBtn.style.position = 'absolute';
-    this.rotateLeftBtn.style.bottom = '80px';
-    this.rotateLeftBtn.style.right = 'calc(50% + 60px)';
-    this.rotateLeftBtn.style.padding = '8px 16px';
-    this.rotateLeftBtn.style.border = 'none';
-    this.rotateLeftBtn.style.borderRadius = '4px';
-    this.rotateLeftBtn.style.background = '#fff';
-    this.rotateLeftBtn.style.color = '#000';
-    this.rotateLeftBtn.style.fontSize = '13px';
-    this.rotateLeftBtn.style.cursor = 'pointer';
-    this.rotateLeftBtn.style.zIndex = '10000';
-    this.rotateLeftBtn.style.display = 'none';
+    Object.assign(this.rotateLeftBtn.style, {
+      position:'absolute', bottom:'80px', right:'calc(50% + 60px)',
+      padding:'8px 16px', border:'none', borderRadius:'4px',
+      background:'#fff', color:'#000', fontSize:'13px', cursor:'pointer',
+      zIndex:'10000', display:'none'
+    });
     this.rotateLeftBtn.onclick = () => this.rotateModel('y', -0.2);
     document.body.appendChild(this.rotateLeftBtn);
 
     this.rotateRightBtn = document.createElement('button');
     this.rotateRightBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i>';
-    this.rotateRightBtn.style.position = 'absolute';
-    this.rotateRightBtn.style.bottom = '80px';
-    this.rotateRightBtn.style.left = 'calc(50% + 60px)';
-    this.rotateRightBtn.style.padding = '8px 16px';
-    this.rotateRightBtn.style.border = 'none';
-    this.rotateRightBtn.style.borderRadius = '4px';
-    this.rotateRightBtn.style.background = '#fff';
-    this.rotateRightBtn.style.color = '#000';
-    this.rotateRightBtn.style.fontSize = '13px';
-    this.rotateRightBtn.style.cursor = 'pointer';
-    this.rotateRightBtn.style.zIndex = '10000';
-    this.rotateRightBtn.style.display = 'none';
+    Object.assign(this.rotateRightBtn.style, {
+      position:'absolute', bottom:'80px', left:'calc(50% + 60px)',
+      padding:'8px 16px', border:'none', borderRadius:'4px',
+      background:'#fff', color:'#000', fontSize:'13px', cursor:'pointer',
+      zIndex:'10000', display:'none'
+    });
     this.rotateRightBtn.onclick = () => this.rotateModel('y', 0.2);
     document.body.appendChild(this.rotateRightBtn);
   }
@@ -499,21 +394,17 @@ class App {
   onSelectEvent(event) {
     if (!this.isPlacingProduct || !this.hitTestSource) return;
     const frame = event.frame;
-    const refSpace = this.renderer.xr.getReferenceSpace();
+    const ref = this.renderer.xr.getReferenceSpace();
     const hits = frame.getHitTestResults(this.hitTestSource);
-    if (hits.length === 0) return;
+    if (!hits.length) return;
 
     const hit = hits[0];
-    const pose = hit.getPose(refSpace);
+    const pose = hit.getPose(ref);
     const bbox = new THREE.Box3().setFromObject(this.productGroup);
     const offsetY = bbox.min.y;
 
     this.productGroup.visible = true;
-    this.productGroup.position.set(
-      pose.transform.position.x,
-      pose.transform.position.y - offsetY,
-      pose.transform.position.z
-    );
+    this.productGroup.position.set(pose.transform.position.x, pose.transform.position.y - offsetY, pose.transform.position.z);
 
     if (this.floor) {
       this.floor.position.copy(this.productGroup.position);
@@ -528,49 +419,30 @@ class App {
     this.rotateLeftBtn.style.display = 'block';
     this.rotateRightBtn.style.display = 'block';
 
-    const session = this.renderer.xr.getSession();
-    session.removeEventListener('select', this._selectBound);
+    const s = this.renderer.xr.getSession();
+    s.removeEventListener('select', this._selectBound);
   }
 
-  // -------------------------------------------------------------------------
-  // Browse Interface
-  // -------------------------------------------------------------------------
+  // Browse (fixed URLs)
   showBrowseInterface() {
     const overlay = document.createElement('div');
-    overlay.style.position = 'fixed';
-    overlay.style.top = '0'; overlay.style.left = '0';
-    overlay.style.width = '100%'; overlay.style.height = '100%';
-    overlay.style.background = 'rgba(0,0,0,0.6)';
-    overlay.style.display = 'flex';
-    overlay.style.alignItems = 'center';
-    overlay.style.justifyContent = 'center';
-    overlay.style.zIndex = '15000';
-
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:15000;';
     const box = document.createElement('div');
-    box.style.background = 'white';
-    box.style.padding = '30px';
-    box.style.borderRadius = '8px';
-    box.style.maxWidth = '90%';
-    box.style.textAlign = 'center';
+    box.style.cssText = 'background:white;padding:30px;border-radius:8px;max-width:90%;text-align:center;';
 
     box.innerHTML = `<h3 style="margin-bottom:15px;">Browse Demo Models</h3>`;
     const grid = document.createElement('div');
-    grid.style.display = 'grid';
-    grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(120px,1fr))';
-    grid.style.gap = '15px';
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:15px;';
 
     const demos = [
-      { name: 'Damaged Helmet', url: 'https://threejs.org/examples/models/gltf/DamagedHelmet.glb' },
-      { name: 'Fox', url: 'https://threejs.org/examples/models/gltf/Fox.glb' },
-      { name: 'Flight Helmet', url: 'https://threejs.org/examples/models/gltf/FlightHelmet/glTF/FlightHelmet.gltf' },
+      { name: 'Damaged Helmet', url: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DamagedHelmet/glTF-Binary/DamagedHelmet.glb' },
+      { name: 'Fox', url: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Fox/glTF-Binary/Fox.glb' },
+      { name: 'Flight Helmet', url: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/FlightHelmet/glTF/FlightHelmet.gltf' },
     ];
 
     demos.forEach(d => {
       const card = document.createElement('div');
-      card.style.cursor = 'pointer';
-      card.style.padding = '10px';
-      card.style.border = '1px solid #ddd';
-      card.style.borderRadius = '6px';
+      card.style.cssText = 'cursor:pointer;padding:10px;border:1px solid #ddd;border-radius:6px;';
       card.innerHTML = `<div style="font-weight:bold;">${d.name}</div>`;
       card.onclick = () => {
         this.clearExistingModels();
@@ -585,27 +457,12 @@ class App {
     document.body.appendChild(overlay);
   }
 
-  // -------------------------------------------------------------------------
-  // Landing Overlay
-  // -------------------------------------------------------------------------
   showLandingOverlay() {
     const overlay = document.createElement('div');
     overlay.id = 'landing-overlay';
-    overlay.style.position = 'fixed';
-    overlay.style.top = '0'; overlay.style.left = '0';
-    overlay.style.width = '100%'; overlay.style.height = '100%';
-    overlay.style.backgroundColor = '#cccccc';
-    overlay.style.display = 'flex';
-    overlay.style.alignItems = 'center';
-    overlay.style.justifyContent = 'center';
-    overlay.style.zIndex = '10000';
-
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#ccc;display:flex;align-items:center;justify-content:center;z-index:10000;';
     const box = document.createElement('div');
-    box.style.background = 'white';
-    box.style.padding = '30px';
-    box.style.borderRadius = '8px';
-    box.style.width = '320px';
-    box.style.textAlign = 'center';
+    box.style.cssText = 'background:white;padding:30px;border-radius:8px;width:320px;text-align:center;';
 
     box.innerHTML = `
       <h1 style="margin:0 0 10px;">3D Model Viewer</h1>
@@ -634,9 +491,6 @@ class App {
     };
   }
 
-  // -------------------------------------------------------------------------
-  // Animation Loop
-  // -------------------------------------------------------------------------
   animate() {
     this.renderer.setAnimationLoop((time, frame) => {
       if (this.isARMode && this.isPlacingProduct && this.hitTestSource && frame) {
