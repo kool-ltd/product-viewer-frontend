@@ -39,9 +39,9 @@ class App {
     this.colorMode = false;
     this.selectedMaterial = null;
     this.selectedMaterialName = '';
-    this.highlightHelper = null;
     this.selectedMesh = null;
     this.colorPanel = null;
+    this.materialsList = [];
 
     // Ensure FontAwesome is loaded
     this.ensureFontAwesomeLoaded();
@@ -296,6 +296,19 @@ class App {
     }
   }
 
+  getMaterials() {
+    const materials = [];
+    let index = 0;
+    this.productGroup.traverse((child) => {
+      if (child.isMesh && child.material) {
+        let mat = Array.isArray(child.material) ? child.material[0] : child.material;
+        const matName = mat.name || `Part ${++index}`;
+        materials.push({mesh: child, material: mat, name: matName});
+      }
+    });
+    return materials;
+  }
+
   createColorPanel() {
     this.colorPanel = document.createElement('div');
     this.colorPanel.style.position = 'fixed';
@@ -310,6 +323,28 @@ class App {
     this.colorPanel.style.alignItems = 'center';
     this.colorPanel.style.justifyContent = 'center';
 
+    // Dropdown for parts
+    const select = document.createElement('select');
+    select.style.marginBottom = '10px';
+    select.style.padding = '5px';
+    select.style.width = '200px';
+
+    this.materialsList = this.getMaterials();
+    this.materialsList.forEach(m => {
+      const option = document.createElement('option');
+      option.value = m.name;
+      option.textContent = m.name;
+      select.appendChild(option);
+    });
+
+    select.addEventListener('change', () => {
+      const selected = this.materialsList.find(m => m.name === select.value);
+      if (selected) {
+        this.handleColorSelect(selected.mesh);
+      }
+    });
+
+    // Color input
     const colorInput = document.createElement('input');
     colorInput.type = 'color';
     colorInput.style.width = '100px';
@@ -325,6 +360,7 @@ class App {
       }
     });
 
+    // Recent colors
     const recentColorsDiv = document.createElement('div');
     recentColorsDiv.style.display = 'flex';
     recentColorsDiv.style.gap = '10px';
@@ -332,9 +368,15 @@ class App {
 
     this.updateRecentColors(recentColorsDiv, colorInput);
 
+    this.colorPanel.appendChild(select);
     this.colorPanel.appendChild(colorInput);
     this.colorPanel.appendChild(recentColorsDiv);
     document.body.appendChild(this.colorPanel);
+
+    // Initial select if there's selected
+    if (this.selectedMesh) {
+      select.value = this.selectedMaterialName;
+    }
   }
 
   updateRecentColors(recentColorsDiv, colorInput) {
@@ -378,26 +420,51 @@ class App {
     this.removeHighlight();
     this.selectedMesh = mesh;
     this.selectedMaterial = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-
-    // Create highlight
-    const boxHelper = new THREE.BoxHelper(mesh, 0xff0000);
-    boxHelper.name = 'highlight';
-    this.scene.add(boxHelper);
-    this.highlightHelper = boxHelper;
+    const matName = this.selectedMaterial.name || 'Unnamed';
+    this.selectedMaterialName = matName;
 
     if (this.colorPanel) {
+      const select = this.colorPanel.querySelector('select');
+      select.value = matName;
       const colorInput = this.colorPanel.querySelector('input[type="color"]');
       colorInput.value = '#' + this.selectedMaterial.color.getHexString();
       const recentColorsDiv = this.colorPanel.querySelector('div');
       this.updateRecentColors(recentColorsDiv, colorInput);
     }
+
+    // Dim other parts
+    this.productGroup.traverse(child => {
+      if (child.isMesh && child.material) {
+        if (child === mesh) {
+          if (child.material.userData.originalOpacity === undefined) {
+            child.material.userData.originalOpacity = child.material.opacity;
+            child.material.userData.originalTransparent = child.material.transparent;
+          }
+          child.material.opacity = 1;
+          child.material.transparent = false;
+        } else {
+          if (child.material.userData.originalOpacity === undefined) {
+            child.material.userData.originalOpacity = child.material.opacity;
+            child.material.userData.originalTransparent = child.material.transparent;
+          }
+          child.material.transparent = true;
+          child.material.opacity = 0.3;
+        }
+        child.material.needsUpdate = true;
+      }
+    });
   }
 
   removeHighlight() {
-    if (this.highlightHelper) {
-      this.scene.remove(this.highlightHelper);
-      this.highlightHelper = null;
-    }
+    this.productGroup.traverse(child => {
+      if (child.isMesh && child.material && child.material.userData.originalOpacity !== undefined) {
+        child.material.opacity = child.material.userData.originalOpacity;
+        child.material.transparent = child.material.userData.originalTransparent;
+        delete child.material.userData.originalOpacity;
+        delete child.material.userData.originalTransparent;
+        child.material.needsUpdate = true;
+      }
+    });
     this.selectedMesh = null;
     this.selectedMaterial = null;
   }
@@ -554,10 +621,8 @@ class App {
     try {
       const response = await fetch('./assets/files.json');
       const data = await response.json();
-      let files = data.files;
-      if (!files || !Array.isArray(files)) {
-        files = [];
-      }
+      let files = data.files || [];
+      
 
       const overlay = document.createElement('div');
       overlay.style.position = 'fixed';
@@ -583,25 +648,31 @@ class App {
       title.textContent = 'Demo Models';
       box.appendChild(title);
 
-      files.forEach(file => {
-        const button = document.createElement('button');
-        button.textContent = file.replace('.glb', '').replace('.gltf', '');
-        button.style.display = 'block';
-        button.style.width = '100%';
-        button.style.margin = '10px 0';
-        button.style.padding = '10px';
-        button.style.backgroundColor = '#d00024';
-        button.style.color = 'white';
-        button.style.border = 'none';
-        button.style.borderRadius = '9999px';
-        button.style.cursor = 'pointer';
+      if (files.length === 0) {
+        const noModels = document.createElement('p');
+        noModels.textContent = 'No demo models available.';
+        box.appendChild(noModels);
+      } else {
+        files.forEach(file => {
+          const button = document.createElement('button');
+          button.textContent = file.replace('.glb', '').replace('.gltf', '');
+          button.style.display = 'block';
+          button.style.width = '100%';
+          button.style.margin = '10px 0';
+          button.style.padding = '10px';
+          button.style.backgroundColor = '#d00024';
+          button.style.color = 'white';
+          button.style.border = 'none';
+          button.style.borderRadius = '9999px';
+          button.style.cursor = 'pointer';
 
-        button.addEventListener('click', async () => {
-          document.body.removeChild(overlay);
-          await this.loadModel(`./assets/${file}`, file.replace('.glb', '').replace('.gltf', ''));
+          button.addEventListener('click', async () => {
+            document.body.removeChild(overlay);
+            await this.loadModel(`./assets/${file}`, file.replace('.glb', '').replace('.gltf', ''));
+          });
+          box.appendChild(button);
         });
-        box.appendChild(button);
-      });
+      }
 
       const closeButton = document.createElement('button');
       closeButton.textContent = 'Close';
@@ -959,10 +1030,6 @@ class App {
             this.placementReticle.visible = false;
           }
         }
-      }
-
-      if (this.highlightHelper) {
-        this.highlightHelper.update();
       }
 
       if (!this.isDragging) {
