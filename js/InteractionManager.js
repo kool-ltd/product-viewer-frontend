@@ -23,12 +23,10 @@ export class InteractionManager {
     this.isDragging = false;
 
     this.mouse = new THREE.Vector2();
-    this.lastMousePosition = new THREE.Vector2();
-    this.lastDragPoint = null;
-
-    this.originalOrbitHandlers = {};
+    this.lastDragPoint = null;   // <-- changed from const
 
     this.setupOrbitControls();
+    this.enableOrbitControls();
     this.setupXRControllers();
     this.setupMouseTouchEvents();
 
@@ -47,36 +45,27 @@ export class InteractionManager {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // Orbit Controls (Mouse/Touch)
-  // -------------------------------------------------------------------------
   setupOrbitControls() {
     this.orbitControls = new OrbitControls(this.camera, this.domElement);
     this.orbitControls.enableDamping = true;
     this.orbitControls.dampingFactor = 0.05;
-  
-    // Event handlers (will be assigned in enable/disable)
     this.orbitStartHandler = null;
     this.orbitChangeHandler = null;
     this.orbitEndHandler = null;
   }
-  
+
   enableOrbitControls() {
     this.orbitControls.enabled = true;
-  
-    // Define no-op handlers (safe to remove later)
     this.orbitStartHandler = () => {};
     this.orbitChangeHandler = () => {};
     this.orbitEndHandler = () => {};
-  
     this.orbitControls.addEventListener('start', this.orbitStartHandler);
     this.orbitControls.addEventListener('change', this.orbitChangeHandler);
     this.orbitControls.addEventListener('end', this.orbitEndHandler);
   }
-  
+
   disableOrbitControls() {
     this.orbitControls.enabled = false;
-  
     if (this.orbitStartHandler) {
       this.orbitControls.removeEventListener('start', this.orbitStartHandler);
       this.orbitControls.removeEventListener('change', this.orbitChangeHandler);
@@ -84,12 +73,8 @@ export class InteractionManager {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // XR Controllers
-  // -------------------------------------------------------------------------
   setupXRControllers() {
-    const controllerModelFactory = new XRControllerModelFactory();
-
+    const factory = new XRControllerModelFactory();
     this.controller1 = this.renderer.xr.getController(0);
     this.controller1.addEventListener('selectstart', this.onSelectStart.bind(this));
     this.controller1.addEventListener('selectend', this.onSelectEnd.bind(this));
@@ -98,7 +83,7 @@ export class InteractionManager {
     this.scene.add(this.controller1);
 
     this.controllerGrip1 = this.renderer.xr.getControllerGrip(0);
-    this.controllerGrip1.add(controllerModelFactory.createControllerModel(this.controllerGrip1));
+    this.controllerGrip1.add(factory.createControllerModel(this.controllerGrip1));
     this.scene.add(this.controllerGrip1);
 
     this.controller2 = this.renderer.xr.getController(1);
@@ -109,19 +94,13 @@ export class InteractionManager {
     this.scene.add(this.controller2);
 
     this.controllerGrip2 = this.renderer.xr.getControllerGrip(1);
-    this.controllerGrip2.add(controllerModelFactory.createControllerModel(this.controllerGrip2));
+    this.controllerGrip2.add(factory.createControllerModel(this.controllerGrip2));
     this.scene.add(this.controllerGrip2);
 
-    // Hide by default
-    this.controller1.visible = false;
-    this.controller2.visible = false;
-    this.controllerGrip1.visible = false;
-    this.controllerGrip2.visible = false;
+    this.controller1.visible = this.controller2.visible = false;
+    this.controllerGrip1.visible = this.controllerGrip2.visible = false;
   }
 
-  // -------------------------------------------------------------------------
-  // Mouse / Touch Events
-  // -------------------------------------------------------------------------
   setupMouseTouchEvents() {
     this.domElement.addEventListener('mousedown', this.onMouseDown.bind(this));
     this.domElement.addEventListener('mousemove', this.onMouseMove.bind(this));
@@ -131,77 +110,45 @@ export class InteractionManager {
     this.domElement.addEventListener('touchend', this.onTouchEnd.bind(this));
   }
 
-  onMouseDown(event) {
-    if (event.button !== 0) return; // Left click only
-    this.onPointerDown(event.clientX, event.clientY);
-  }
+  onMouseDown(e) { if (e.button !== 0) return; this.onPointerDown(e.clientX, e.clientY); }
+  onTouchStart(e) { if (e.touches.length !== 1) return; const t = e.touches[0]; this.onPointerDown(t.clientX, t.clientY); }
 
-  onTouchStart(event) {
-    if (event.touches.length !== 1) return;
-    const touch = event.touches[0];
-    this.onPointerDown(touch.clientX, touch.clientY);
-  }
-
-  onPointerDown(clientX, clientY) {
+  onPointerDown(x, y) {
     if (this.isDragging) return;
-
-    this.mouse.x = (clientX / window.innerWidth) * 2 - 1;
-    this.mouse.y = -(clientY / window.innerHeight) * 2 + 1;
-
+    this.mouse.x = (x / window.innerWidth) * 2 - 1;
+    this.mouse.y = -(y / window.innerHeight) * 2 + 1;
     this.raycaster.setFromCamera(this.mouse, this.camera);
-    const intersects = this.raycaster.intersectObjects(this.draggableObjects, true);
-
-    if (intersects.length > 0) {
-      const obj = intersects[0].object;
-      while (obj.parent && !this.draggableObjects.includes(obj.parent)) {
-        obj = obj.parent;
-      }
+    const hits = this.raycaster.intersectObjects(this.draggableObjects, true);
+    if (hits.length) {
+      let obj = hits[0].object;
+      while (obj.parent && !this.draggableObjects.includes(obj.parent)) obj = obj.parent;
       if (this.draggableObjects.includes(obj)) {
         this.selectedObject = obj;
         this.isDragging = true;
-        this.lastDragPoint = intersects[0].point.clone();
+        this.lastDragPoint = hits[0].point.clone();
         this.disableOrbitControls();
       }
     }
   }
 
-  onMouseMove(event) {
-    this.onPointerMove(event.clientX, event.clientY);
-  }
+  onMouseMove(e) { this.onPointerMove(e.clientX, e.clientY); }
+  onTouchMove(e) { if (e.touches.length !== 1) return; const t = e.touches[0]; this.onPointerMove(t.clientX, t.clientY); }
 
-  onTouchMove(event) {
-    if (event.touches.length !== 1) return;
-    const touch = event.touches[0];
-    this.onPointerMove(touch.clientX, touch.clientY);
-  }
-
-  onPointerMove(clientX, clientY) {
+  onPointerMove(x, y) {
     if (!this.isDragging || !this.selectedObject) return;
-
-    this.mouse.x = (clientX / window.innerWidth) * 2 - 1;
-    this.mouse.y = -(clientY / window.innerHeight) * 2 + 1;
-
+    this.mouse.x = (x / window.innerWidth) * 2 - 1;
+    this.mouse.y = -(y / window.innerHeight) * 2 + 1;
     this.raycaster.setFromCamera(this.mouse, this.camera);
-    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(
-      new THREE.Vector3(0, 1, 0),
-      this.selectedObject.position
-    );
-    const intersectPoint = new THREE.Vector3();
-    this.raycaster.ray.intersectPlane(plane, intersectPoint);
-
-    const delta = intersectPoint.clone().sub(this.lastDragPoint);
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(new THREE.Vector3(0,1,0), this.selectedObject.position);
+    const point = new THREE.Vector3();
+    this.raycaster.ray.intersectPlane(plane, point);
+    const delta = point.clone().sub(this.lastDragPoint);
     this.selectedObject.position.add(delta);
-    this.lastDragPoint = intersectPoint.clone();
+    this.lastDragPoint = point.clone();
   }
 
-  onMouseUp() {
-    this.onPointerUp();
-  }
-
-  onTouchEnd() {
-    this.onPointerUp();
-  }
-
+  onMouseUp() { this.onPointerUp(); }
+  onTouchEnd() { this.onPointerUp(); }
   onPointerUp() {
     if (this.isDragging) {
       this.isDragging = false;
@@ -210,81 +157,54 @@ export class InteractionManager {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // XR Controller Events
-  // -------------------------------------------------------------------------
-  onSelectStart(event) {
-    const controller = event.target;
-    this.activeController = controller;
-
-    const intersects = this.getIntersections(controller);
-    if (intersects.length > 0) {
-      const obj = intersects[0].object;
-      let root = obj;
-      while (root.parent && !this.draggableObjects.includes(root.parent)) {
-        root = root.parent;
-      }
-      if (this.draggableObjects.includes(root)) {
-        this.selectedObject = root;
-        this.lastControllerPosition.copy(controller.position);
+  onSelectStart(e) {
+    const ctrl = e.target;
+    this.activeController = ctrl;
+    const hits = this.getIntersections(ctrl);
+    if (hits.length) {
+      let obj = hits[0].object;
+      while (obj.parent && !this.draggableObjects.includes(obj.parent)) obj = obj.parent;
+      if (this.draggableObjects.includes(obj)) {
+        this.selectedObject = obj;
+        this.lastControllerPosition.copy(ctrl.position);
       }
     }
   }
 
-  onSelectEnd() {
-    this.selectedObject = null;
-    this.activeController = null;
-  }
+  onSelectEnd() { this.selectedObject = null; this.activeController = null; }
 
-  onSqueezeStart(event) {
-    const controller = event.target;
+  onSqueezeStart(e) {
     if (this.selectedObject) {
       this.rotationMode = true;
-      this.startControllerQuaternion.copy(controller.quaternion);
+      this.startControllerQuaternion.copy(e.target.quaternion);
       this.startObjectQuaternion.copy(this.selectedObject.quaternion);
     }
   }
 
-  onSqueezeEnd() {
-    this.rotationMode = false;
-  }
+  onSqueezeEnd() { this.rotationMode = false; }
 
   getIntersections(controller) {
-    const tempMatrix = new THREE.Matrix4();
-    tempMatrix.identity().extractRotation(controller.matrixWorld);
-
+    const temp = new THREE.Matrix4().identity().extractRotation(controller.matrixWorld);
     this.raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
-    this.raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
-
+    this.raycaster.ray.direction.set(0,0,-1).applyMatrix4(temp);
     return this.raycaster.intersectObjects(this.draggableObjects, true);
   }
 
-  // -------------------------------------------------------------------------
-  // Update
-  // -------------------------------------------------------------------------
   update() {
     if (!this.isXRSessionActive) return;
-
     if (this.activeController && this.selectedObject) {
-      const controllerPos = this.activeController.position;
-      const delta = new THREE.Vector3().subVectors(controllerPos, this.lastControllerPosition);
+      const pos = this.activeController.position;
+      const delta = new THREE.Vector3().subVectors(pos, this.lastControllerPosition);
       this.selectedObject.position.add(delta);
-      this.lastControllerPosition.copy(controllerPos);
+      this.lastControllerPosition.copy(pos);
     }
-
     if (this.rotationMode && this.selectedObject && this.activeController) {
-      const currentQuat = this.activeController.quaternion;
-      const deltaQuat = new THREE.Quaternion().copy(currentQuat).multiply(this.startControllerQuaternion.clone().conjugate());
-      this.selectedObject.quaternion.copy(this.startObjectQuaternion).multiply(deltaQuat);
+      const cur = this.activeController.quaternion;
+      const deltaQ = new THREE.Quaternion().copy(cur).multiply(this.startControllerQuaternion.clone().conjugate());
+      this.selectedObject.quaternion.copy(this.startObjectQuaternion).multiply(deltaQ);
     }
-
     this.orbitControls.update();
   }
 
-  // -------------------------------------------------------------------------
-  // Public: Set draggable objects
-  // -------------------------------------------------------------------------
-  setDraggableObjects(objects) {
-    this.draggableObjects = objects;
-  }
+  setDraggableObjects(arr) { this.draggableObjects = arr; }
 }
