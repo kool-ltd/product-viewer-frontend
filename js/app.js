@@ -210,7 +210,7 @@ class App {
     this.scene.add(this.productGroup);
 
     const floorGeometry = new THREE.PlaneGeometry(10, 10);
-    const shadowMaterial = new THREE.ShadowMaterial({ opacity: 0.1 });
+    const shadowMaterial = new THREE.ShadowMaterial({ opacity: 0.2 });
     this.floor = new THREE.Mesh(floorGeometry, shadowMaterial);
     this.floor.rotation.x = -Math.PI / 2;
     this.floor.receiveShadow = true;
@@ -419,10 +419,81 @@ class App {
     document.body.appendChild(overlay);
   }
 
-  showBrowseInterface() {
-    console.log("Browse interface not implemented. Add demo model URLs here.");
-    // Example: load a demo model
-    // this.loadModel('https://example.com/demo.glb', 'demo');
+  async showBrowseInterface() {
+    const loadingOverlay = document.getElementById('loading-overlay');
+    if (loadingOverlay) loadingOverlay.style.display = 'flex';
+
+    try {
+      const response = await fetch('./assets/files.json');
+      const data = await response.json();
+      const files = data.files;
+
+      const overlay = document.createElement('div');
+      overlay.style.position = 'fixed';
+      overlay.style.top = '0';
+      overlay.style.left = '0';
+      overlay.style.width = '100%';
+      overlay.style.height = '100%';
+      overlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
+      overlay.style.display = 'flex';
+      overlay.style.alignItems = 'center';
+      overlay.style.justifyContent = 'center';
+      overlay.style.zIndex = '10000';
+
+      const box = document.createElement('div');
+      box.style.backgroundColor = 'white';
+      box.style.padding = '20px';
+      box.style.borderRadius = '8px';
+      box.style.width = '300px';
+      box.style.maxHeight = '80%';
+      box.style.overflowY = 'auto';
+
+      const title = document.createElement('h3');
+      title.textContent = 'Demo Models';
+      box.appendChild(title);
+
+      files.forEach(file => {
+        const button = document.createElement('button');
+        button.textContent = file.replace('.glb', '').replace('.gltf', '');
+        button.style.display = 'block';
+        button.style.width = '100%';
+        button.style.margin = '10px 0';
+        button.style.padding = '10px';
+        button.style.backgroundColor = '#d00024';
+        button.style.color = 'white';
+        button.style.border = 'none';
+        button.style.borderRadius = '9999px';
+        button.style.cursor = 'pointer';
+
+        button.addEventListener('click', async () => {
+          document.body.removeChild(overlay);
+          await this.loadModel(`./assets/${file}`, file.replace('.glb', '').replace('.gltf', ''));
+        });
+        box.appendChild(button);
+      });
+
+      const closeButton = document.createElement('button');
+      closeButton.textContent = 'Close';
+      closeButton.style.width = '100%';
+      closeButton.style.marginTop = '20px';
+      closeButton.style.padding = '10px';
+      closeButton.style.backgroundColor = '#999';
+      closeButton.style.color = 'white';
+      closeButton.style.border = 'none';
+      closeButton.style.borderRadius = '9999px';
+      closeButton.style.cursor = 'pointer';
+      closeButton.addEventListener('click', () => {
+        document.body.removeChild(overlay);
+      });
+      box.appendChild(closeButton);
+
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+    } catch (error) {
+      console.error('Error fetching demo files:', error);
+    } finally {
+      if (loadingOverlay) loadingOverlay.style.display = 'none';
+    }
   }
 
   handleColorSelect(mesh) {
@@ -440,6 +511,8 @@ class App {
 
   showColorPickerModal() {
     if (!this.selectedMaterial) return;
+
+    const self = this;
 
     // Create modal overlay
     const overlay = document.createElement('div');
@@ -520,7 +593,7 @@ class App {
       }
       
       // Then add recent colors
-      const recentColors = getRecentColors();
+      const recentColors = self.getRecentColors();
       recentColors.forEach(color => {
         const colorBtn = document.createElement('button');
         colorBtn.style.width = '30px';
@@ -559,7 +632,7 @@ class App {
 
     doneBtn.addEventListener('click', () => {
       const colorValue = colorInput.value;
-      addRecentColor(colorValue);
+      self.addRecentColor(colorValue);
       document.body.removeChild(overlay);
     });
 
@@ -604,7 +677,6 @@ class App {
     document.body.appendChild(overlay);
   }
 
-  // Functions to manage recent colors
   getRecentColors() {
     try {
       const storedColors = localStorage.getItem('recentColors');
@@ -721,7 +793,7 @@ class App {
           // Create a new floor with shadow material
           const floorGeometry = new THREE.PlaneGeometry(20, 20);
           const shadowMaterial = new THREE.ShadowMaterial({
-              opacity: 0.07 // Subtle shadows only
+              opacity: 0.2 // Increased opacity
           });
           
           this.floor = new THREE.Mesh(floorGeometry, shadowMaterial);
