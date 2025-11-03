@@ -35,14 +35,6 @@ class App {
     this.isSingleTouchRotating = false;
     this.arRotationControls = null;
     
-    // Color mode
-    this.colorMode = false;
-    this.selectedMaterial = null;
-    this.selectedMaterialName = '';
-    this.selectedMesh = null;
-    this.colorPanel = null;
-    this.materialsList = [];
-
     // Ensure FontAwesome is loaded
     this.ensureFontAwesomeLoaded();
     
@@ -51,23 +43,12 @@ class App {
 
     // Set up THREE.LoadingManager (progress updates are no longer displayed).
     this.loadingManager = new THREE.LoadingManager(() => {});
-    this.loadingManager.onStart = () => {
-      const progressBar = document.getElementById('progress-bar');
-      if (progressBar) progressBar.style.width = '0%';
-    };
-    this.loadingManager.onProgress = (url, loaded, total) => {
-      const progress = (loaded / total) * 100;
-      const progressBar = document.getElementById('progress-bar');
-      if (progressBar) progressBar.style.width = `${progress}%`;
-    };
-    this.loadingManager.onLoad = () => {
-      const loadingOverlay = document.getElementById('loading-overlay');
-      if (loadingOverlay) loadingOverlay.style.display = 'none';
-    };
+    this.loadingManager.onProgress = (url, loaded, total) => {};
     
     this.gltfLoader = new GLTFLoader(this.loadingManager);
     this.rgbeLoader = new RGBELoader(this.loadingManager);
 
+    this.init();
     this.setupScene();
     this.setupLights();
     this.setupInitialControls();
@@ -125,12 +106,12 @@ class App {
     document.addEventListener('touchmove', this.onTouchMove.bind(this), { passive: false });
     document.addEventListener('touchend', this.onTouchEnd.bind(this), { passive: false });
 
-    // XR session start listener for tap‑to‑place integration
-    this.renderer.xr.addEventListener('sessionstart', this.onXRSessionStart.bind(this));
+    // AR session start listener for tap‑to‑place integration
+    this.renderer.xr.addEventListener('sessionstart', this.onARSessionStart.bind(this));
     
-    // XR session end listener
+    // AR session end listener
     this.renderer.xr.addEventListener('sessionend', () => {
-      console.log("XR session ended");
+      console.log("AR session ended");
       this.isARMode = false;
       this.scene.background = new THREE.Color(0xc0c0c1);
       this.renderer.setClearColor(0xc0c0c1, 1);
@@ -154,319 +135,6 @@ class App {
       link.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css';
       document.head.appendChild(link);
     }
-  }
-
-  createLoadingOverlay() {
-    const overlay = document.createElement('div');
-    overlay.id = 'loading-overlay';
-    overlay.style.position = 'fixed';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.width = '100%';
-    overlay.style.height = '100%';
-    overlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
-    overlay.style.display = 'none';
-    overlay.style.alignItems = 'center';
-    overlay.style.justifyContent = 'center';
-    overlay.style.zIndex = '10000';
-    overlay.style.flexDirection = 'column';
-
-    const message = document.createElement('p');
-    message.textContent = 'Loading...';
-    message.style.color = 'white';
-    message.style.marginBottom = '10px';
-
-    const progressBarContainer = document.createElement('div');
-    progressBarContainer.style.width = '200px';
-    progressBarContainer.style.height = '20px';
-    progressBarContainer.style.background = '#ddd';
-    progressBarContainer.style.borderRadius = '10px';
-    progressBarContainer.style.overflow = 'hidden';
-
-    const progressBar = document.createElement('div');
-    progressBar.id = 'progress-bar';
-    progressBar.style.height = '100%';
-    progressBar.style.background = '#d00024';
-    progressBar.style.width = '0%';
-    progressBar.style.transition = 'width 0.3s ease';
-
-    progressBarContainer.appendChild(progressBar);
-    overlay.appendChild(message);
-    overlay.appendChild(progressBarContainer);
-    document.body.appendChild(overlay);
-  }
-
-  setupScene() {
-    this.container = document.getElementById('scene-container');
-    this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xc0c0c1);
-    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    this.camera.position.set(0, 1.6, 3);
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
-    this.renderer.setPixelRatio(window.devicePixelRatio);
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.xr.enabled = true;
-    this.container.appendChild(this.renderer.domElement);
-
-    this.productGroup = new THREE.Group();
-    this.scene.add(this.productGroup);
-
-    const floorGeometry = new THREE.PlaneGeometry(10, 10);
-    const shadowMaterial = new THREE.ShadowMaterial({ opacity: 0.2 });
-    this.floor = new THREE.Mesh(floorGeometry, shadowMaterial);
-    this.floor.rotation.x = -Math.PI / 2;
-    this.floor.receiveShadow = true;
-    this.scene.add(this.floor);
-
-    window.addEventListener('resize', this.onWindowResize.bind(this));
-  }
-
-  onWindowResize() {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-  }
-
-  setupLights() {
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 3));
-
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
-    directionalLight.position.set(0, 20, 0);
-    directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
-    directionalLight.shadow.camera.near = 0.5;
-    directionalLight.shadow.camera.far = 500;
-    this.scene.add(directionalLight);
-  }
-
-  setupInitialControls() {
-    this.orbitControls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.orbitControls.enableDamping = true;
-    this.orbitControls.dampingFactor = 0.05;
-    this.orbitControls.screenSpacePanning = false;
-    this.orbitControls.minDistance = 1;
-    this.orbitControls.maxDistance = 500;
-    this.orbitControls.maxPolarAngle = Math.PI / 2;
-  }
-
-  clearExistingModels() {
-    this.loadedModels.forEach((model) => {
-      this.productGroup.remove(model);
-    });
-    this.loadedModels.clear();
-    this.draggableObjects = [];
-    this.interactionManager.setDraggableObjects([]);
-  }
-
-  fitCameraToScene() {
-    if (!this.productGroup.children.length) return;
-
-    const box = new THREE.Box3().setFromObject(this.productGroup);
-    const size = box.getSize(new THREE.Vector3()).length();
-    const center = box.getCenter(new THREE.Vector3());
-
-    this.camera.position.copy(center);
-    this.camera.position.x += size / 2.0;
-    this.camera.position.y += size / 5.0;
-    this.camera.position.z += size / 2.0;
-    this.camera.lookAt(center);
-
-    this.orbitControls.target.copy(center);
-    this.orbitControls.update();
-  }
-
-  toggleColorMode(enabled) {
-    if (enabled) {
-      showConfirmationModal('Click on a part to select and color it.');
-      this.createColorPanel();
-      this.container.style.height = '70vh';
-      this.onWindowResize();
-      this.fitCameraToScene();
-    } else {
-      if (this.colorPanel) {
-        document.body.removeChild(this.colorPanel);
-        this.colorPanel = null;
-      }
-      this.removeHighlight();
-      this.container.style.height = '100vh';
-      this.onWindowResize();
-      this.fitCameraToScene();
-    }
-  }
-
-  getMaterials() {
-    const materials = [];
-    let index = 0;
-    this.productGroup.traverse((child) => {
-      if (child.isMesh && child.material) {
-        let mat = Array.isArray(child.material) ? child.material[0] : child.material;
-        const matName = mat.name || `Part ${++index}`;
-        materials.push({mesh: child, material: mat, name: matName});
-      }
-    });
-    return materials;
-  }
-
-  createColorPanel() {
-    this.colorPanel = document.createElement('div');
-    this.colorPanel.style.position = 'fixed';
-    this.colorPanel.style.bottom = '0';
-    this.colorPanel.style.left = '0';
-    this.colorPanel.style.width = '100%';
-    this.colorPanel.style.height = '30vh';
-    this.colorPanel.style.backgroundColor = 'white';
-    this.colorPanel.style.zIndex = '1000';
-    this.colorPanel.style.display = 'flex';
-    this.colorPanel.style.flexDirection = 'column';
-    this.colorPanel.style.alignItems = 'center';
-    this.colorPanel.style.justifyContent = 'center';
-
-    // Dropdown for parts
-    const select = document.createElement('select');
-    select.style.marginBottom = '10px';
-    select.style.padding = '5px';
-    select.style.width = '200px';
-
-    this.materialsList = this.getMaterials();
-    this.materialsList.forEach(m => {
-      const option = document.createElement('option');
-      option.value = m.name;
-      option.textContent = m.name;
-      select.appendChild(option);
-    });
-
-    select.addEventListener('change', () => {
-      const selected = this.materialsList.find(m => m.name === select.value);
-      if (selected) {
-        this.handleColorSelect(selected.mesh);
-      }
-    });
-
-    // Color input
-    const colorInput = document.createElement('input');
-    colorInput.type = 'color';
-    colorInput.style.width = '100px';
-    colorInput.style.height = '100px';
-    colorInput.style.border = 'none';
-    colorInput.style.background = 'transparent';
-    colorInput.style.cursor = 'pointer';
-
-    colorInput.addEventListener('input', () => {
-      if (this.selectedMaterial) {
-        const color = new THREE.Color(colorInput.value);
-        this.selectedMaterial.color.set(color);
-      }
-    });
-
-    // Recent colors
-    const recentColorsDiv = document.createElement('div');
-    recentColorsDiv.style.display = 'flex';
-    recentColorsDiv.style.gap = '10px';
-    recentColorsDiv.style.marginTop = '20px';
-
-    this.updateRecentColors(recentColorsDiv, colorInput);
-
-    this.colorPanel.appendChild(select);
-    this.colorPanel.appendChild(colorInput);
-    this.colorPanel.appendChild(recentColorsDiv);
-    document.body.appendChild(this.colorPanel);
-
-    // Initial select if there's selected
-    if (this.selectedMesh) {
-      select.value = this.selectedMaterialName;
-    }
-  }
-
-  updateRecentColors(recentColorsDiv, colorInput) {
-    recentColorsDiv.innerHTML = '';
-
-    if (this.selectedMaterial && this.selectedMaterial.userData.originalColor) {
-      const originalBtn = document.createElement('button');
-      originalBtn.style.backgroundColor = this.selectedMaterial.userData.originalColor;
-      originalBtn.style.width = '30px';
-      originalBtn.style.height = '30px';
-      originalBtn.style.border = '1px solid #ccc';
-      originalBtn.style.borderRadius = '50%';
-      originalBtn.addEventListener('click', () => {
-        colorInput.value = this.selectedMaterial.userData.originalColor;
-        const color = new THREE.Color(this.selectedMaterial.userData.originalColor);
-        this.selectedMaterial.color.set(color);
-      });
-      recentColorsDiv.appendChild(originalBtn);
-    }
-
-    const recentColors = this.getRecentColors();
-    recentColors.forEach(color => {
-      const btn = document.createElement('button');
-      btn.style.backgroundColor = color;
-      btn.style.width = '30px';
-      btn.style.height = '30px';
-      btn.style.border = '1px solid #ccc';
-      btn.style.borderRadius = '50%';
-      btn.addEventListener('click', () => {
-        colorInput.value = color;
-        const threeColor = new THREE.Color(color);
-        if (this.selectedMaterial) {
-          this.selectedMaterial.color.set(threeColor);
-        }
-      });
-      recentColorsDiv.appendChild(btn);
-    });
-  }
-
-  handleColorSelect(mesh) {
-    this.removeHighlight();
-    this.selectedMesh = mesh;
-    this.selectedMaterial = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-    const matName = this.selectedMaterial.name || 'Unnamed';
-    this.selectedMaterialName = matName;
-
-    if (this.colorPanel) {
-      const select = this.colorPanel.querySelector('select');
-      select.value = matName;
-      const colorInput = this.colorPanel.querySelector('input[type="color"]');
-      colorInput.value = '#' + this.selectedMaterial.color.getHexString();
-      const recentColorsDiv = this.colorPanel.querySelector('div');
-      this.updateRecentColors(recentColorsDiv, colorInput);
-    }
-
-    // Dim other parts
-    this.productGroup.traverse(child => {
-      if (child.isMesh && child.material) {
-        if (child === mesh) {
-          if (child.material.userData.originalOpacity === undefined) {
-            child.material.userData.originalOpacity = child.material.opacity;
-            child.material.userData.originalTransparent = child.material.transparent;
-          }
-          child.material.opacity = 1;
-          child.material.transparent = false;
-        } else {
-          if (child.material.userData.originalOpacity === undefined) {
-            child.material.userData.originalOpacity = child.material.opacity;
-            child.material.userData.originalTransparent = child.material.transparent;
-          }
-          child.material.transparent = true;
-          child.material.opacity = 0.3;
-        }
-        child.material.needsUpdate = true;
-      }
-    });
-  }
-
-  removeHighlight() {
-    this.productGroup.traverse(child => {
-      if (child.isMesh && child.material && child.material.userData.originalOpacity !== undefined) {
-        child.material.opacity = child.material.userData.originalOpacity;
-        child.material.transparent = child.material.userData.originalTransparent;
-        delete child.material.userData.originalOpacity;
-        delete child.material.userData.originalTransparent;
-        child.material.needsUpdate = true;
-      }
-    });
-    this.selectedMesh = null;
-    this.selectedMaterial = null;
   }
 
   // -----------------------------------------------------------------------------
@@ -614,261 +282,136 @@ class App {
     document.body.appendChild(overlay);
   }
 
-  async showBrowseInterface() {
-    const loadingOverlay = document.getElementById('loading-overlay');
-    if (loadingOverlay) loadingOverlay.style.display = 'flex';
+  // ...(truncated 24272 characters)...       const tempIntersects = [];
+                    
+                    // Perform direct intersection test with actual meshes inside this container
+                    this.children.forEach(child => {
+                        child.traverse(object => {
+                            if (object.isMesh) {
+                                // Store original visibility of matrix auto update
+                                const originalMatrixAutoUpdate = object.matrixAutoUpdate;
+                                // Temporarily enable matrix auto update to ensure correct world matrix
+                                object.matrixAutoUpdate = true;
+                                object.updateMatrixWorld(true);
+                                
+                                // Use the mesh's own raycast method
+                                object.raycast(raycaster, tempIntersects);
+                                
+                                // Restore original setting
+                                object.matrixAutoUpdate = originalMatrixAutoUpdate;
+                            }
+                        });
+                    });
+                    
+                    if (tempIntersects.length > 0) {
+                        // If any mesh was hit, add the container as the intersected object
+                        // but use the actual intersection point
+                        intersects.push({
+                            distance: tempIntersects[0].distance,
+                            point: tempIntersects[0].point.clone(),
+                            object: this  // Return this container as the hit object
+                        });
+                    }
+                };
 
-    try {
-      const response = await fetch('./assets/files.json');
-      const data = await response.json();
-      let files = data.files || [];
-      
-
-      const overlay = document.createElement('div');
-      overlay.style.position = 'fixed';
-      overlay.style.top = '0';
-      overlay.style.left = '0';
-      overlay.style.width = '100%';
-      overlay.style.height = '100%';
-      overlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
-      overlay.style.display = 'flex';
-      overlay.style.alignItems = 'center';
-      overlay.style.justifyContent = 'center';
-      overlay.style.zIndex = '10000';
-
-      const box = document.createElement('div');
-      box.style.backgroundColor = 'white';
-      box.style.padding = '20px';
-      box.style.borderRadius = '8px';
-      box.style.width = '300px';
-      box.style.maxHeight = '80%';
-      box.style.overflowY = 'auto';
-
-      const title = document.createElement('h3');
-      title.textContent = 'Demo Models';
-      box.appendChild(title);
-
-      if (files.length === 0) {
-        const noModels = document.createElement('p');
-        noModels.textContent = 'No demo models available.';
-        box.appendChild(noModels);
-      } else {
-        files.forEach(file => {
-          const button = document.createElement('button');
-          button.textContent = file.replace('.glb', '').replace('.gltf', '');
-          button.style.display = 'block';
-          button.style.width = '100%';
-          button.style.margin = '10px 0';
-          button.style.padding = '10px';
-          button.style.backgroundColor = '#d00024';
-          button.style.color = 'white';
-          button.style.border = 'none';
-          button.style.borderRadius = '9999px';
-          button.style.cursor = 'pointer';
-
-          button.addEventListener('click', async () => {
-            document.body.removeChild(overlay);
-            await this.loadModel(`./assets/${file}`, file.replace('.glb', '').replace('.gltf', ''));
-          });
-          box.appendChild(button);
-        });
-      }
-
-      const closeButton = document.createElement('button');
-      closeButton.textContent = 'Close';
-      closeButton.style.width = '100%';
-      closeButton.style.marginTop = '20px';
-      closeButton.style.padding = '10px';
-      closeButton.style.backgroundColor = '#999';
-      closeButton.style.color = 'white';
-      closeButton.style.border = 'none';
-      closeButton.style.borderRadius = '9999px';
-      closeButton.style.cursor = 'pointer';
-      closeButton.addEventListener('click', () => {
-        document.body.removeChild(overlay);
-      });
-      box.appendChild(closeButton);
-
-      overlay.appendChild(box);
-      document.body.appendChild(overlay);
-    } catch (error) {
-      console.error('Error fetching demo files:', error);
-    } finally {
-      if (loadingOverlay) loadingOverlay.style.display = 'none';
-    }
-  }
-
-  getRecentColors() {
-    try {
-      const storedColors = localStorage.getItem('recentColors');
-      return storedColors ? JSON.parse(storedColors) : [];
-    } catch (e) {
-      console.error('Error loading recent colors:', e);
-      return [];
-    }
-  }
-
-  addRecentColor(color) {
-    try {
-      let recentColors = this.getRecentColors();
-      
-      // Remove the color if it already exists
-      recentColors = recentColors.filter(c => c !== color);
-      
-      // Add to the beginning
-      recentColors.unshift(color);
-      
-      // Keep only the most recent 6
-      recentColors = recentColors.slice(0, 6);
-      
-      localStorage.setItem('recentColors', JSON.stringify(recentColors));
-    } catch (e) {
-      console.error('Error saving recent colors:', e);
-    }
-  }
-
-  loadModel(url, name) {
-    return new Promise((resolve, reject) => {
-      this.gltfLoader.load(
-          url,
-          (gltf) => {
-              const container = new THREE.Group();
-              container.name = name;
-              container.add(gltf.scene);
-              container.raycast = function(raycaster, intersects) {
-                  const tempIntersects = [];
-                  
-                  // Perform direct intersection test with actual meshes inside this container
-                  this.children.forEach(child => {
-                      child.traverse(object => {
-                          if (object.isMesh) {
-                              // Store original visibility of matrix auto update
-                              const originalMatrixAutoUpdate = object.matrixAutoUpdate;
-                              // Temporarily enable matrix auto update to ensure correct world matrix
-                              object.matrixAutoUpdate = true;
-                              object.updateMatrixWorld(true);
-                              
-                              // Use the mesh's own raycast method
-                              object.raycast(raycaster, tempIntersects);
-                              
-                              // Restore original setting
-                              object.matrixAutoUpdate = originalMatrixAutoUpdate;
-                          }
-                      });
-                  });
-                  
-                  if (tempIntersects.length > 0) {
-                      // If any mesh was hit, add the container as the intersected object
-                      // but use the actual intersection point
-                      intersects.push({
-                          distance: tempIntersects[0].distance,
-                          point: tempIntersects[0].point.clone(),
-                          object: this  // Return this container as the hit object
-                      });
-                  }
-              };
-
-              this.draggableObjects.push(container);
-              this.productGroup.add(container);
-              this.loadedModels.set(name, container);
-              
-              // Only update InteractionManager
-              if (this.interactionManager) {
-                  this.interactionManager.setDraggableObjects(Array.from(this.loadedModels.values()));
-              }
-              
-              this.fitCameraToScene();
-              console.log(`Loaded model: ${name}`);
-              resolve(container);
-          },
-          xhr => {},
-          error => {
-              console.error(`Error loading model ${name}:`, error);
-              reject(error);
-          }
-      );
+                this.draggableObjects.push(container);
+                this.productGroup.add(container);
+                this.loadedModels.set(name, container);
+                
+                // Only update InteractionManager
+                if (this.interactionManager) {
+                    this.interactionManager.setDraggableObjects(Array.from(this.loadedModels.values()));
+                }
+                
+                this.fitCameraToScene();
+                console.log(`Loaded model: ${name}`);
+                resolve(container);
+            },
+            xhr => {},
+            error => {
+                console.error(`Error loading model ${name}:`, error);
+                reject(error);
+            }
+        );
     });
   }
 
-  onXRSessionStart() {
-    console.log("XR session started - entering XR mode");
-    const session = this.renderer.xr.getSession();
-    if (!session) return;
-
-    let refSpaceType = 'local-floor';
-
-    if (session.mode === 'immersive-ar') {
-      this.isARMode = true;
-      // AR specific setup
-      this.scene.background = null;
-      this.isPlacingProduct = true;
+  onARSessionStart() {
+    console.log("AR session started - entering tap-to-place mode");
+    this.isARMode = true;
+    this.isPlacingProduct = true;
+    
+    // Hide the productGroup until placement occurs
+    if (this.productGroup) {
       this.productGroup.visible = false;
-      if (this.placementMessage) this.placementMessage.style.display = 'block';
-      if (this.placeAgainButton) this.placeAgainButton.style.display = 'none';
-
-      // Update floor for AR mode
-      if (this.floor) {
-          // Remove the old floor
-          this.scene.remove(this.floor);
-          
-          // Create a new floor with shadow material
-          const floorGeometry = new THREE.PlaneGeometry(20, 20);
-          const shadowMaterial = new THREE.ShadowMaterial({
-              opacity: 0.2 // Increased opacity
-          });
-          
-          this.floor = new THREE.Mesh(floorGeometry, shadowMaterial);
-          this.floor.receiveShadow = true;
-          this.floor.rotation.x = -Math.PI / 2;
-          this.floor.visible = false; // Hide until placement
-          this.scene.add(this.floor);
-      }
-
-      // Prepare the placement UI elements
-      if (!this.placementReticle) {
-        this.createPlacementUI();
-      }
-
-      // Ensure rotation buttons are created
-      if (!this.rotateLeftBtn || !this.rotateRightBtn) {
-        this.createARRotationControls();
-      }
-
-      // Hide rotation buttons until model is placed
-      if (this.rotateLeftBtn) this.rotateLeftBtn.style.display = 'none';
-      if (this.rotateRightBtn) this.rotateRightBtn.style.display = 'none';
-
-    } else if (session.mode === 'immersive-vr') {
-      this.isARMode = false;
-      // VR specific setup
-      this.productGroup.position.set(0, 0, -2);
-      this.productGroup.visible = true;
-      if (this.floor) {
-        this.floor.position.set(0, 0, 0);
-        this.floor.visible = true;
-      }
     }
 
-    session.requestReferenceSpace(refSpaceType)
-      .catch((err) => {
-        console.warn("Preferred reference space unavailable, falling back to viewer:", err);
-        return session.requestReferenceSpace('viewer');
-      })
-      .then((referenceSpace) => {
-        if (this.isARMode) {
-          return session.requestHitTestSource({ space: referenceSpace });
-        }
-      })
-      .then((source) => {
-        if (this.isARMode) {
-          this.hitTestSource = source;
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to obtain hit test source:", err);
-      });
+    // Update the scene background to show the camera feed by setting it to null
+    this.scene.background = null;
 
-    if (this.isARMode) {
+    // Update floor for AR mode
+    if (this.floor) {
+        // Remove the old floor
+        this.scene.remove(this.floor);
+        
+        // Create a new floor with shadow material
+        const floorGeometry = new THREE.PlaneGeometry(20, 20);
+        const shadowMaterial = new THREE.ShadowMaterial({
+            opacity: 0.07 // Subtle shadows only
+        });
+        
+        this.floor = new THREE.Mesh(floorGeometry, shadowMaterial);
+        this.floor.receiveShadow = true;
+        this.floor.rotation.x = -Math.PI / 2;
+        this.floor.visible = false; // Hide until placement
+        this.scene.add(this.floor);
+    }
+    
+    // Prepare the placement UI elements
+    if (!this.placementReticle) {
+      this.createPlacementUI();
+      this.placementMessage.style.display = 'block';
+    } else {
+      this.placementMessage.style.display = 'block';
+      this.placeAgainButton.style.display = 'none';
+    }
+    
+    // Ensure rotation buttons are created
+    if (!this.rotateLeftBtn || !this.rotateRightBtn) {
+      this.createARRotationControls();
+    }
+    
+    // Hide rotation buttons until model is placed
+    if (this.rotateLeftBtn) this.rotateLeftBtn.style.display = 'none';
+    if (this.rotateRightBtn) this.rotateRightBtn.style.display = 'none';
+    
+    // Optionally hide the AR button UI element
+    const arButton = document.querySelector('.ar-button');
+    if (arButton) {
+      arButton.style.display = 'none';
+    }
+    
+    // Get the current XR session
+    const session = this.renderer.xr.getSession();
+    
+    if (session) {
+      // Request the reference space using "local-floor" for consistent hit testing.
+      session.requestReferenceSpace('local-floor')
+        .catch((err) => {
+          console.warn("local-floor reference space unavailable, falling back to viewer:", err);
+          return session.requestReferenceSpace('viewer');
+        })
+        .then((referenceSpace) => {
+          return session.requestHitTestSource({ space: referenceSpace });
+        })
+        .then((source) => {
+          this.hitTestSource = source;
+        })
+        .catch((err) => {
+          console.error("Failed to obtain hit test source:", err);
+        });
+    
+      // Bind select events for tap-to-place functionality.
       this.onSelectEventBound = this.onSelectEvent.bind(this);
       session.addEventListener('select', this.onSelectEventBound);
       session.addEventListener('end', () => {
@@ -992,26 +535,10 @@ class App {
     }
   }
 
-  onTouchStart(event) {
-    // Stub - add logic if needed
-  }
-
-  onTouchMove(event) {
-    // Stub - add logic if needed
-  }
-
-  onTouchEnd(event) {
-    // Stub - add logic if needed
-  }
-
-  handlePointerMove(event) {
-    // Stub - add logic if needed
-  }
-
   animate() {
     this.renderer.setAnimationLoop((time, frame) => {
       // AR Tap-to-Place Reticle Update
-      if (this.renderer.xr.isPresenting && this.isARMode && this.isPlacingProduct && this.hitTestSource && frame) {
+      if (this.isARMode && this.isPlacingProduct && this.hitTestSource && frame) {
         const referenceSpace = this.renderer.xr.getReferenceSpace();
         const hitTestResults = frame.getHitTestResults(this.hitTestSource);
         if (hitTestResults.length > 0) {
