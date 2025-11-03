@@ -181,12 +181,13 @@ function showMaterialColorPicker(app) {
   // Save button next to color input
   const saveBtn = document.createElement('button');
   saveBtn.textContent = 'Save';
-  saveBtn.style.backgroundColor = '#666';
+  saveBtn.style.backgroundColor = 'rgb(102, 102, 102)';
   saveBtn.style.color = 'white';
   saveBtn.style.border = 'none';
   saveBtn.style.borderRadius = '9999px';
-  saveBtn.style.padding = '8px 24px';
+  saveBtn.style.padding = '6px 19px';
   saveBtn.style.cursor = 'pointer';
+  saveBtn.style.marginBottom = '15px';
   saveBtn.addEventListener('click', () => {
     const colorValue = colorInput.value;
     addRecentColor(colorValue);
