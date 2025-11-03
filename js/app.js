@@ -39,6 +39,9 @@ class App {
     this.colorMode = false;
     this.selectedMaterial = null;
     this.selectedMaterialName = '';
+    this.highlightHelper = null;
+    this.selectedMesh = null;
+    this.colorPanel = null;
 
     // Ensure FontAwesome is loaded
     this.ensureFontAwesomeLoaded();
@@ -274,6 +277,131 @@ class App {
     this.orbitControls.update();
   }
 
+  toggleColorMode(enabled) {
+    if (enabled) {
+      showConfirmationModal('Click on a part to select and color it.');
+      this.createColorPanel();
+      this.container.style.height = '70vh';
+      this.onWindowResize();
+      this.fitCameraToScene();
+    } else {
+      if (this.colorPanel) {
+        document.body.removeChild(this.colorPanel);
+        this.colorPanel = null;
+      }
+      this.removeHighlight();
+      this.container.style.height = '100vh';
+      this.onWindowResize();
+      this.fitCameraToScene();
+    }
+  }
+
+  createColorPanel() {
+    this.colorPanel = document.createElement('div');
+    this.colorPanel.style.position = 'fixed';
+    this.colorPanel.style.bottom = '0';
+    this.colorPanel.style.left = '0';
+    this.colorPanel.style.width = '100%';
+    this.colorPanel.style.height = '30vh';
+    this.colorPanel.style.backgroundColor = 'white';
+    this.colorPanel.style.zIndex = '1000';
+    this.colorPanel.style.display = 'flex';
+    this.colorPanel.style.flexDirection = 'column';
+    this.colorPanel.style.alignItems = 'center';
+    this.colorPanel.style.justifyContent = 'center';
+
+    const colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.style.width = '100px';
+    colorInput.style.height = '100px';
+    colorInput.style.border = 'none';
+    colorInput.style.background = 'transparent';
+    colorInput.style.cursor = 'pointer';
+
+    colorInput.addEventListener('input', () => {
+      if (this.selectedMaterial) {
+        const color = new THREE.Color(colorInput.value);
+        this.selectedMaterial.color.set(color);
+      }
+    });
+
+    const recentColorsDiv = document.createElement('div');
+    recentColorsDiv.style.display = 'flex';
+    recentColorsDiv.style.gap = '10px';
+    recentColorsDiv.style.marginTop = '20px';
+
+    this.updateRecentColors(recentColorsDiv, colorInput);
+
+    this.colorPanel.appendChild(colorInput);
+    this.colorPanel.appendChild(recentColorsDiv);
+    document.body.appendChild(this.colorPanel);
+  }
+
+  updateRecentColors(recentColorsDiv, colorInput) {
+    recentColorsDiv.innerHTML = '';
+
+    if (this.selectedMaterial && this.selectedMaterial.userData.originalColor) {
+      const originalBtn = document.createElement('button');
+      originalBtn.style.backgroundColor = this.selectedMaterial.userData.originalColor;
+      originalBtn.style.width = '30px';
+      originalBtn.style.height = '30px';
+      originalBtn.style.border = '1px solid #ccc';
+      originalBtn.style.borderRadius = '50%';
+      originalBtn.addEventListener('click', () => {
+        colorInput.value = this.selectedMaterial.userData.originalColor;
+        const color = new THREE.Color(this.selectedMaterial.userData.originalColor);
+        this.selectedMaterial.color.set(color);
+      });
+      recentColorsDiv.appendChild(originalBtn);
+    }
+
+    const recentColors = this.getRecentColors();
+    recentColors.forEach(color => {
+      const btn = document.createElement('button');
+      btn.style.backgroundColor = color;
+      btn.style.width = '30px';
+      btn.style.height = '30px';
+      btn.style.border = '1px solid #ccc';
+      btn.style.borderRadius = '50%';
+      btn.addEventListener('click', () => {
+        colorInput.value = color;
+        const threeColor = new THREE.Color(color);
+        if (this.selectedMaterial) {
+          this.selectedMaterial.color.set(threeColor);
+        }
+      });
+      recentColorsDiv.appendChild(btn);
+    });
+  }
+
+  handleColorSelect(mesh) {
+    this.removeHighlight();
+    this.selectedMesh = mesh;
+    this.selectedMaterial = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+
+    // Create highlight
+    const boxHelper = new THREE.BoxHelper(mesh, 0xff0000);
+    boxHelper.name = 'highlight';
+    this.scene.add(boxHelper);
+    this.highlightHelper = boxHelper;
+
+    if (this.colorPanel) {
+      const colorInput = this.colorPanel.querySelector('input[type="color"]');
+      colorInput.value = '#' + this.selectedMaterial.color.getHexString();
+      const recentColorsDiv = this.colorPanel.querySelector('div');
+      this.updateRecentColors(recentColorsDiv, colorInput);
+    }
+  }
+
+  removeHighlight() {
+    if (this.highlightHelper) {
+      this.scene.remove(this.highlightHelper);
+      this.highlightHelper = null;
+    }
+    this.selectedMesh = null;
+    this.selectedMaterial = null;
+  }
+
   // -----------------------------------------------------------------------------
   // AR Rotation Controls
   // -----------------------------------------------------------------------------
@@ -426,7 +554,10 @@ class App {
     try {
       const response = await fetch('./assets/files.json');
       const data = await response.json();
-      const files = data.files;
+      let files = data.files;
+      if (!files || !Array.isArray(files)) {
+        files = [];
+      }
 
       const overlay = document.createElement('div');
       overlay.style.position = 'fixed';
@@ -494,187 +625,6 @@ class App {
     } finally {
       if (loadingOverlay) loadingOverlay.style.display = 'none';
     }
-  }
-
-  handleColorSelect(mesh) {
-    this.selectedMaterial = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-    const matName = this.selectedMaterial.name || this.selectedMaterial.uuid;
-    const modelName = mesh.parent.name || 'Model';
-    this.selectedMaterialName = `${matName.charAt(0).toUpperCase() + matName.slice(1)} - ${modelName}`;
-
-    if (!this.selectedMaterial.userData.originalColor) {
-      this.selectedMaterial.userData.originalColor = '#' + this.selectedMaterial.color.getHexString();
-    }
-
-    this.showColorPickerModal();
-  }
-
-  showColorPickerModal() {
-    if (!this.selectedMaterial) return;
-
-    const self = this;
-
-    // Create modal overlay
-    const overlay = document.createElement('div');
-    overlay.style.position = 'fixed';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.width = '100%';
-    overlay.style.height = '100%';
-    overlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
-    overlay.style.display = 'flex';
-    overlay.style.alignItems = 'center';
-    overlay.style.justifyContent = 'center';
-    overlay.style.zIndex = '10000';
-
-    const modal = document.createElement('div');
-    modal.style.backgroundColor = 'white';
-    modal.style.padding = '20px';
-    modal.style.borderRadius = '8px';
-    modal.style.width = '300px';
-
-    const heading = document.createElement('h3');
-    heading.textContent = `Color for ${this.selectedMaterialName}`;
-    heading.style.marginTop = '0';
-
-    // Color picker section
-    const colorPickerWrapper = document.createElement('div');
-
-    // Input for the color picker
-    const colorInput = document.createElement('input');
-    colorInput.type = 'color';
-    colorInput.style.padding = 'revert';
-    colorInput.value = '#' + this.selectedMaterial.color.getHexString();
-    colorInput.style.marginBottom = '15px';
-
-    // Recent colors section
-    const recentColorsHeading = document.createElement('h4');
-    recentColorsHeading.textContent = 'Colors';
-    recentColorsHeading.style.marginBottom = '10px';
-
-    const recentColorsDiv = document.createElement('div');
-    recentColorsDiv.style.display = 'flex';
-    recentColorsDiv.style.flexWrap = 'wrap';
-    recentColorsDiv.style.gap = '8px';
-    recentColorsDiv.style.marginBottom = '15px';
-
-    // Function to build the recent colors UI
-    function updateRecentColorsUI(originalColor) {
-      recentColorsDiv.innerHTML = '';
-      
-      // Add original color first
-      if (originalColor) {
-        const originalColorWrapper = document.createElement('div');
-        originalColorWrapper.style.display = 'flex';
-        originalColorWrapper.style.flexDirection = 'column';
-        originalColorWrapper.style.alignItems = 'center';
-        
-        const originalColorBtn = document.createElement('button');
-        originalColorBtn.style.width = '30px';
-        originalColorBtn.style.height = '30px';
-        originalColorBtn.style.backgroundColor = originalColor;
-        originalColorBtn.style.border = '1px solid #ccc';
-        originalColorBtn.style.borderRadius = '4px';
-        originalColorBtn.style.cursor = 'pointer';
-        
-        const label = document.createElement('span');
-        label.textContent = 'Original';
-        label.style.fontSize = '10px';
-        label.style.marginTop = '2px';
-        
-        originalColorBtn.addEventListener('click', () => {
-          colorInput.value = originalColor;
-          applyColor(originalColor);
-        });
-        
-        originalColorWrapper.appendChild(originalColorBtn);
-        originalColorWrapper.appendChild(label);
-        recentColorsDiv.appendChild(originalColorWrapper);
-      }
-      
-      // Then add recent colors
-      const recentColors = self.getRecentColors();
-      recentColors.forEach(color => {
-        const colorBtn = document.createElement('button');
-        colorBtn.style.width = '30px';
-        colorBtn.style.height = '30px';
-        colorBtn.style.backgroundColor = color;
-        colorBtn.style.border = '1px solid #ccc';
-        colorBtn.style.borderRadius = '4px';
-        colorBtn.style.cursor = 'pointer';
-        
-        colorBtn.addEventListener('click', () => {
-          colorInput.value = color;
-          applyColor(color);
-        });
-        
-        recentColorsDiv.appendChild(colorBtn);
-      });
-    }
-
-    const originalColor = this.selectedMaterial.userData.originalColor;
-    updateRecentColorsUI(originalColor);
-
-    // Buttons container
-    const buttonsDiv = document.createElement('div');
-    buttonsDiv.style.display = 'flex';
-    buttonsDiv.style.justifyContent = 'space-between';
-
-    // Done button
-    const doneBtn = document.createElement('button');
-    doneBtn.textContent = 'Done';
-    doneBtn.style.backgroundColor = '#d00024';
-    doneBtn.style.color = 'white';
-    doneBtn.style.border = 'none';
-    doneBtn.style.borderRadius = '9999px';
-    doneBtn.style.padding = '8px 24px';
-    doneBtn.style.cursor = 'pointer';
-
-    doneBtn.addEventListener('click', () => {
-      const colorValue = colorInput.value;
-      self.addRecentColor(colorValue);
-      document.body.removeChild(overlay);
-    });
-
-    // Cancel button
-    const cancelBtn = document.createElement('button');
-    cancelBtn.textContent = 'Cancel';
-    cancelBtn.style.backgroundColor = '#999';
-    cancelBtn.style.color = 'white';
-    cancelBtn.style.border = 'none';
-    cancelBtn.style.borderRadius = '9999px';
-    cancelBtn.style.padding = '8px 24px';
-    cancelBtn.style.cursor = 'pointer';
-    cancelBtn.style.marginRight = '15px';
-    cancelBtn.addEventListener('click', () => {
-      document.body.removeChild(overlay);
-    });
-
-    // Apply color function
-    const applyColor = (colorValue) => {
-      const color = new THREE.Color(colorValue);
-      this.selectedMaterial.color.set(color);
-    };
-
-    // Live update
-    colorInput.addEventListener('input', () => {
-      applyColor(colorInput.value);
-    });
-
-    // Assemble the modal
-    buttonsDiv.appendChild(cancelBtn);
-    buttonsDiv.appendChild(doneBtn);
-
-    colorPickerWrapper.appendChild(colorInput);
-
-    modal.appendChild(heading);
-    modal.appendChild(colorPickerWrapper);
-    modal.appendChild(recentColorsHeading);
-    modal.appendChild(recentColorsDiv);
-    modal.appendChild(buttonsDiv);
-
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
   }
 
   getRecentColors() {
@@ -1009,6 +959,10 @@ class App {
             this.placementReticle.visible = false;
           }
         }
+      }
+
+      if (this.highlightHelper) {
+        this.highlightHelper.update();
       }
 
       if (!this.isDragging) {
