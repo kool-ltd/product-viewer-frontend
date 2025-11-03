@@ -58,17 +58,12 @@ function createColorButton(app) {
     colorButton.style.backgroundColor = '#b0001d';
   });
   colorButton.addEventListener('mouseout', () => {
-    colorButton.style.backgroundColor = app.colorMode ? '#008000' : '#d00024';
+    colorButton.style.backgroundColor = app.colorMode ? '#b0001d' : '#d00024';
   });
   
   colorButton.addEventListener('click', () => {
     app.colorMode = !app.colorMode;
-    if (app.colorMode) {
-      colorButton.style.backgroundColor = '#008000';
-      showConfirmationModal('Click on a part to change its color.');
-    } else {
-      colorButton.style.backgroundColor = '#d00024';
-    }
+    app.toggleColorMode(app.colorMode);
   });
   
   return colorButton;
