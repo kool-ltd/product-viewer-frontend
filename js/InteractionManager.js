@@ -115,6 +115,8 @@ export class InteractionManager {
                     return false;
                 }
             }
+            // If no intersection in color mode, do nothing to allow orbit
+            return;
         } else {
             // Normal drag mode
             // Cast ray from mouse position
@@ -156,6 +158,9 @@ export class InteractionManager {
                     console.log("Selected for drag:", this.selectedObject.name);
                     return false; // Prevent default
                 }
+            } else {
+                // If no draggable intersected, allow orbit
+                return;
             }
         }
     }
@@ -217,6 +222,8 @@ export class InteractionManager {
                     return false;
                 }
             }
+            // If no intersection in color mode, do nothing to allow orbit
+            return;
         } else {
             // Normal drag mode
             // Cast ray
@@ -255,6 +262,9 @@ export class InteractionManager {
                     console.log("Selected for drag (touch):", this.selectedObject.name);
                     return false;
                 }
+            } else {
+                // If no draggable intersected, allow orbit
+                return;
             }
         }
     }
