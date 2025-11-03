@@ -98,69 +98,45 @@ export class InteractionManager {
         // Update mouse position
         this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-        if (window.app.colorMode) {
-            // Color selection mode
-            this.raycaster.setFromCamera(this.mouse, this.camera);
-            const intersects = this.raycaster.intersectObjects(this.scene.children, true);
-            if (intersects.length > 0) {
-                let object = intersects[0].object;
-                while (object && !object.isMesh) {
-                    object = object.parent;
-                }
-                if (object && object.isMesh && object.material) {
-                    window.app.handleColorSelect(object);
-                    event.stopPropagation();
-                    event.preventDefault();
-                    return false;
-                }
-            }
-            // If no intersection in color mode, do nothing to allow orbit
-            return;
-        } else {
-            // Normal drag mode
-            // Cast ray from mouse position
-            this.raycaster.setFromCamera(this.mouse, this.camera);
-            const intersects = this.raycaster.intersectObjects(this.draggableObjects, true);
+        
+        // Cast ray from mouse position
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        const intersects = this.raycaster.intersectObjects(this.draggableObjects, true);
+        
+        if (intersects.length > 0) {
+            // Find the top-level draggable parent of the intersected object
+            let object = intersects[0].object;
+            let topLevelDraggable = null;
             
-            if (intersects.length > 0) {
-                // Find the top-level draggable parent of the intersected object
-                let object = intersects[0].object;
-                let topLevelDraggable = null;
-                
-                // Traverse up the parent hierarchy
-                while (object) {
-                    // If this object is in our draggable list, it's a potential candidate
-                    if (this.draggableObjects.includes(object)) {
-                        topLevelDraggable = object;
-                    }
-                    // Stop at scene level
-                    if (object === this.scene) break;
-                    object = object.parent;
+            // Traverse up the parent hierarchy
+            while (object) {
+                // If this object is in our draggable list, it's a potential candidate
+                if (this.draggableObjects.includes(object)) {
+                    topLevelDraggable = object;
                 }
+                // Stop at scene level
+                if (object === this.scene) break;
+                object = object.parent;
+            }
+            
+            if (topLevelDraggable) {
+                // Explicitly disable OrbitControls by removing its event handlers
+                this.disableOrbitControls();
                 
-                if (topLevelDraggable) {
-                    // Explicitly disable OrbitControls by removing its event handlers
-                    this.disableOrbitControls();
-                    
-                    this.isDragging = true;
-                    this.selectedObject = topLevelDraggable;
-                    
-                    // Completely stop event propagation
-                    event.stopPropagation();
-                    event.preventDefault();
-                    
-                    // Store initial mouse position for calculating drag delta
-                    this.lastMousePosition.x = event.clientX;
-                    this.lastMousePosition.y = event.clientY;
-                    this.lastDragPoint = null; // Reset drag point reference
-                    
-                    console.log("Selected for drag:", this.selectedObject.name);
-                    return false; // Prevent default
-                }
-            } else {
-                // If no draggable intersected, allow orbit
-                return;
+                this.isDragging = true;
+                this.selectedObject = topLevelDraggable;
+                
+                // Completely stop event propagation
+                event.stopPropagation();
+                event.preventDefault();
+                
+                // Store initial mouse position for calculating drag delta
+                this.lastMousePosition.x = event.clientX;
+                this.lastMousePosition.y = event.clientY;
+                this.lastDragPoint = null; // Reset drag point reference
+                
+                console.log("Selected for drag:", this.selectedObject.name);
+                return false; // Prevent default
             }
         }
     }
@@ -206,65 +182,41 @@ export class InteractionManager {
         this.mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
         this.mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
         
-        if (window.app.colorMode) {
-            // Color selection mode
-            this.raycaster.setFromCamera(this.mouse, this.camera);
-            const intersects = this.raycaster.intersectObjects(this.scene.children, true);
-            if (intersects.length > 0) {
-                let object = intersects[0].object;
-                while (object && !object.isMesh) {
-                    object = object.parent;
-                }
-                if (object && object.isMesh && object.material) {
-                    window.app.handleColorSelect(object);
-                    event.stopPropagation();
-                    event.preventDefault();
-                    return false;
-                }
-            }
-            // If no intersection in color mode, do nothing to allow orbit
-            return;
-        } else {
-            // Normal drag mode
-            // Cast ray
-            this.raycaster.setFromCamera(this.mouse, this.camera);
-            const intersects = this.raycaster.intersectObjects(this.draggableObjects, true);
+        // Cast ray
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        const intersects = this.raycaster.intersectObjects(this.draggableObjects, true);
+        
+        if (intersects.length > 0) {
+            // Find the top-level draggable parent
+            let object = intersects[0].object;
+            let topLevelDraggable = null;
             
-            if (intersects.length > 0) {
-                // Find the top-level draggable parent
-                let object = intersects[0].object;
-                let topLevelDraggable = null;
-                
-                while (object) {
-                    if (this.draggableObjects.includes(object)) {
-                        topLevelDraggable = object;
-                    }
-                    if (object === this.scene) break;
-                    object = object.parent;
+            while (object) {
+                if (this.draggableObjects.includes(object)) {
+                    topLevelDraggable = object;
                 }
+                if (object === this.scene) break;
+                object = object.parent;
+            }
+            
+            if (topLevelDraggable) {
+                // Explicitly disable OrbitControls
+                this.disableOrbitControls();
                 
-                if (topLevelDraggable) {
-                    // Explicitly disable OrbitControls
-                    this.disableOrbitControls();
-                    
-                    this.isDragging = true;
-                    this.selectedObject = topLevelDraggable;
-                    
-                    // Stop event propagation
-                    event.stopPropagation();
-                    event.preventDefault();
-                    
-                    // Store initial touch position
-                    this.lastMousePosition.x = touch.clientX;
-                    this.lastMousePosition.y = touch.clientY;
-                    this.lastDragPoint = null;
-                    
-                    console.log("Selected for drag (touch):", this.selectedObject.name);
-                    return false;
-                }
-            } else {
-                // If no draggable intersected, allow orbit
-                return;
+                this.isDragging = true;
+                this.selectedObject = topLevelDraggable;
+                
+                // Stop event propagation
+                event.stopPropagation();
+                event.preventDefault();
+                
+                // Store initial touch position
+                this.lastMousePosition.x = touch.clientX;
+                this.lastMousePosition.y = touch.clientY;
+                this.lastDragPoint = null;
+                
+                console.log("Selected for drag (touch):", this.selectedObject.name);
+                return false;
             }
         }
     }
@@ -466,39 +418,26 @@ export class InteractionManager {
         this.raycaster.intersectObjects(this.scene.children, true, allIntersects);
         
         if (allIntersects.length > 0) {
-            if (window.app.colorMode) {
-                // Color selection mode
-                let object = allIntersects[0].object;
-                while (object && !object.isMesh) {
-                    object = object.parent;
+            // Find the top-level draggable parent of the intersected object
+            let object = allIntersects[0].object;
+            let topLevelDraggable = null;
+            
+            // Traverse up the parent hierarchy
+            while (object) {
+                // If this object is in our draggable list, it's a potential candidate
+                if (this.draggableObjects.includes(object)) {
+                    topLevelDraggable = object;
                 }
-                if (object && object.isMesh && object.material) {
-                    window.app.handleColorSelect(object);
-                }
-                return;
-            } else {
-                // Normal drag mode
-                // Find the top-level draggable parent of the intersected object
-                let object = allIntersects[0].object;
-                let topLevelDraggable = null;
-                
-                // Traverse up the parent hierarchy
-                while (object) {
-                    // If this object is in our draggable list, it's a potential candidate
-                    if (this.draggableObjects.includes(object)) {
-                        topLevelDraggable = object;
-                    }
-                    // Stop at scene level
-                    if (object === this.scene) break;
-                    object = object.parent;
-                }
-                
-                if (topLevelDraggable) {
-                    console.log("Selected object:", topLevelDraggable.name || topLevelDraggable.uuid);
-                    this.selectedObject = topLevelDraggable;
-                    this.activeController = controller;
-                    this.lastControllerPosition.setFromMatrixPosition(controller.matrixWorld);
-                }
+                // Stop at scene level
+                if (object === this.scene) break;
+                object = object.parent;
+            }
+            
+            if (topLevelDraggable) {
+                console.log("Selected object:", topLevelDraggable.name || topLevelDraggable.uuid);
+                this.selectedObject = topLevelDraggable;
+                this.activeController = controller;
+                this.lastControllerPosition.setFromMatrixPosition(controller.matrixWorld);
             }
         }
     }
