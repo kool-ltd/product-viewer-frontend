@@ -70,6 +70,25 @@ function getMaterialsByName(app) {
   return materialMap;
 }
 
+// Function to fit the scene preserving the current view direction
+function fitPreservingView(app) {
+  if (!app.productGroup) return;
+
+  const box = new THREE.Box3().setFromObject(app.productGroup);
+  const size = box.getSize(new THREE.Vector3());
+  const maxSize = Math.max(size.x, size.y, size.z);
+
+  const currentDir = app.orbitControls.target.clone().sub(app.camera.position).normalize();
+
+  const fitHeightDistance = maxSize / (2 * Math.tan(app.camera.fov * Math.PI / 360));
+  const fitWidthDistance = fitHeightDistance / app.camera.aspect;
+  const newDistance = 1.2 * Math.max(fitHeightDistance, fitWidthDistance);
+
+  app.camera.position.copy(app.orbitControls.target.clone().sub(currentDir.multiplyScalar(newDistance)));
+  app.camera.lookAt(app.orbitControls.target);
+  app.orbitControls.update();
+}
+
 // Color picker interface
 function showMaterialColorPicker(app) {
   // Get materials
@@ -105,7 +124,7 @@ function showMaterialColorPicker(app) {
   app.renderer.setSize(sceneContainer.clientWidth, sceneContainer.clientHeight);
   app.camera.aspect = sceneContainer.clientWidth / sceneContainer.clientHeight;
   app.camera.updateProjectionMatrix();
-  app.fitCameraToScene();
+  fitPreservingView(app);
 
   // Create lower panel for color picker
   const panel = document.createElement('div');
@@ -148,6 +167,9 @@ function showMaterialColorPicker(app) {
   
   // Color picker section
   const colorPickerWrapper = document.createElement('div');
+  colorPickerWrapper.style.display = 'flex';
+  colorPickerWrapper.style.alignItems = 'center';
+  colorPickerWrapper.style.gap = '10px';
   
   // Input for the color picker
   const colorInput = document.createElement('input');
@@ -155,6 +177,21 @@ function showMaterialColorPicker(app) {
   colorInput.style.padding = 'revert';
   colorInput.value = '#ff0000'; // Default red
   colorInput.style.marginBottom = '15px';
+  
+  // Save button next to color input
+  const saveBtn = document.createElement('button');
+  saveBtn.textContent = 'Save';
+  saveBtn.style.backgroundColor = '#666';
+  saveBtn.style.color = 'white';
+  saveBtn.style.border = 'none';
+  saveBtn.style.borderRadius = '9999px';
+  saveBtn.style.padding = '8px 24px';
+  saveBtn.style.cursor = 'pointer';
+  saveBtn.addEventListener('click', () => {
+    const colorValue = colorInput.value;
+    addRecentColor(colorValue);
+    updateRecentColorsUI();
+  });
   
   // Recent colors section
   const recentColorsHeading = document.createElement('h4');
@@ -261,22 +298,6 @@ function showMaterialColorPicker(app) {
   buttonsDiv.style.display = 'flex';
   buttonsDiv.style.justifyContent = 'space-between';
   
-  // Save button
-  const saveBtn = document.createElement('button');
-  saveBtn.textContent = 'Save';
-  saveBtn.style.backgroundColor = '#666';
-  saveBtn.style.color = 'white';
-  saveBtn.style.border = 'none';
-  saveBtn.style.borderRadius = '9999px';
-  saveBtn.style.padding = '8px 24px';
-  saveBtn.style.cursor = 'pointer';
-  saveBtn.style.marginRight = '15px';
-  saveBtn.addEventListener('click', () => {
-    const colorValue = colorInput.value;
-    addRecentColor(colorValue);
-    updateRecentColorsUI();
-  });
-  
   // Apply button
   const applyBtn = document.createElement('button');
   applyBtn.className = 'color-apply-btn';
@@ -304,7 +325,7 @@ function showMaterialColorPicker(app) {
     app.renderer.setSize(window.innerWidth, window.innerHeight);
     app.camera.aspect = window.innerWidth / window.innerHeight;
     app.camera.updateProjectionMatrix();
-    app.fitCameraToScene();
+    // Do not call fit to keep last view
   });
   
   // Cancel button
@@ -333,15 +354,15 @@ function showMaterialColorPicker(app) {
     app.renderer.setSize(window.innerWidth, window.innerHeight);
     app.camera.aspect = window.innerWidth / window.innerHeight;
     app.camera.updateProjectionMatrix();
-    app.fitCameraToScene();
+    // Do not call fit to keep last view
   });
   
   // Assemble the container
   buttonsDiv.appendChild(cancelBtn);
-  buttonsDiv.appendChild(saveBtn);
   buttonsDiv.appendChild(applyBtn);
   
   colorPickerWrapper.appendChild(colorInput);
+  colorPickerWrapper.appendChild(saveBtn);
   
   container.appendChild(heading);
   container.appendChild(materialSelect);
