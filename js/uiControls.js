@@ -85,9 +85,9 @@ function showMaterialColorPicker(app) {
     originalColors.set(key, '#' + data.material.color.getHexString());
   });
 
-  // Resize the scene container to upper part (3:1 ratio)
+  // Resize the scene container to upper part (65vh)
   const sceneContainer = document.getElementById('scene-container');
-  sceneContainer.style.height = '75vh';
+  sceneContainer.style.height = '65vh';
   sceneContainer.style.top = '0';
 
   // Update renderer and camera to fit the new size
@@ -102,7 +102,7 @@ function showMaterialColorPicker(app) {
   panel.style.bottom = '0';
   panel.style.left = '0';
   panel.style.width = '100%';
-  panel.style.height = '25vh';
+  panel.style.height = '35vh';
   panel.style.backgroundColor = 'white';
   panel.style.zIndex = '10000';
   panel.style.overflowY = 'auto';
@@ -186,6 +186,7 @@ function showMaterialColorPicker(app) {
       
       originalColorBtn.addEventListener('click', () => {
         colorInput.value = originalColor;
+        applyColorToMaterial(app, materialMap, selectedMaterialKey, originalColor);
       });
       
       originalColorWrapper.appendChild(originalColorBtn);
@@ -206,6 +207,7 @@ function showMaterialColorPicker(app) {
       
       colorBtn.addEventListener('click', () => {
         colorInput.value = color;
+        applyColorToMaterial(app, materialMap, selectedMaterialKey, color);
       });
       
       recentColorsDiv.appendChild(colorBtn);
@@ -222,7 +224,7 @@ function showMaterialColorPicker(app) {
             obj.userData.originalOpacity = obj.material.opacity;
           }
           obj.material.transparent = true;
-          obj.material.opacity = 0.3;
+          obj.material.opacity = 0.2;
           obj.material.needsUpdate = true;
         } else {
           // Ensure selected are restored
