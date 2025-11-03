@@ -65,7 +65,6 @@ class App {
     this.gltfLoader = new GLTFLoader(this.loadingManager);
     this.rgbeLoader = new RGBELoader(this.loadingManager);
 
-    this.init();
     this.setupScene();
     this.setupLights();
     this.setupInitialControls();
@@ -123,10 +122,10 @@ class App {
     document.addEventListener('touchmove', this.onTouchMove.bind(this), { passive: false });
     document.addEventListener('touchend', this.onTouchEnd.bind(this), { passive: false });
 
-    // AR session start listener for tap‑to‑place integration
+    // XR session start listener for tap‑to‑place integration
     this.renderer.xr.addEventListener('sessionstart', this.onXRSessionStart.bind(this));
     
-    // AR session end listener
+    // XR session end listener
     this.renderer.xr.addEventListener('sessionend', () => {
       console.log("XR session ended");
       this.isARMode = false;
@@ -192,6 +191,87 @@ class App {
     overlay.appendChild(message);
     overlay.appendChild(progressBarContainer);
     document.body.appendChild(overlay);
+  }
+
+  setupScene() {
+    this.container = document.getElementById('scene-container');
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0xc0c0c1);
+    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    this.camera.position.set(0, 1.6, 3);
+    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.xr.enabled = true;
+    this.container.appendChild(this.renderer.domElement);
+
+    this.productGroup = new THREE.Group();
+    this.scene.add(this.productGroup);
+
+    const floorGeometry = new THREE.PlaneGeometry(10, 10);
+    const shadowMaterial = new THREE.ShadowMaterial({ opacity: 0.1 });
+    this.floor = new THREE.Mesh(floorGeometry, shadowMaterial);
+    this.floor.rotation.x = -Math.PI / 2;
+    this.floor.receiveShadow = true;
+    this.scene.add(this.floor);
+
+    window.addEventListener('resize', this.onWindowResize.bind(this));
+  }
+
+  onWindowResize() {
+    this.camera.aspect = window.innerWidth / window.innerHeight;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  setupLights() {
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 3));
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
+    directionalLight.position.set(0, 20, 0);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    directionalLight.shadow.camera.near = 0.5;
+    directionalLight.shadow.camera.far = 500;
+    this.scene.add(directionalLight);
+  }
+
+  setupInitialControls() {
+    this.orbitControls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.orbitControls.enableDamping = true;
+    this.orbitControls.dampingFactor = 0.05;
+    this.orbitControls.screenSpacePanning = false;
+    this.orbitControls.minDistance = 1;
+    this.orbitControls.maxDistance = 500;
+    this.orbitControls.maxPolarAngle = Math.PI / 2;
+  }
+
+  clearExistingModels() {
+    this.loadedModels.forEach((model) => {
+      this.productGroup.remove(model);
+    });
+    this.loadedModels.clear();
+    this.draggableObjects = [];
+    this.interactionManager.setDraggableObjects([]);
+  }
+
+  fitCameraToScene() {
+    if (!this.productGroup.children.length) return;
+
+    const box = new THREE.Box3().setFromObject(this.productGroup);
+    const size = box.getSize(new THREE.Vector3()).length();
+    const center = box.getCenter(new THREE.Vector3());
+
+    this.camera.position.copy(center);
+    this.camera.position.x += size / 2.0;
+    this.camera.position.y += size / 5.0;
+    this.camera.position.z += size / 2.0;
+    this.camera.lookAt(center);
+
+    this.orbitControls.target.copy(center);
+    this.orbitControls.update();
   }
 
   // -----------------------------------------------------------------------------
@@ -337,6 +417,12 @@ class App {
     box.appendChild(buttonsContainer);
     overlay.appendChild(box);
     document.body.appendChild(overlay);
+  }
+
+  showBrowseInterface() {
+    console.log("Browse interface not implemented. Add demo model URLs here.");
+    // Example: load a demo model
+    // this.loadModel('https://example.com/demo.glb', 'demo');
   }
 
   handleColorSelect(mesh) {
@@ -546,30 +632,6 @@ class App {
     } catch (e) {
       console.error('Error saving recent colors:', e);
     }
-  }
-
-  init() {
-    // Stub for init if needed
-  }
-
-  setupScene() {
-    // Stub for scene setup
-    this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera();
-    this.renderer = new THREE.WebGLRenderer();
-    // etc.
-  }
-
-  setupLights() {
-    // Stub for lights
-  }
-
-  setupInitialControls() {
-    // Stub for controls
-  }
-
-  clearExistingModels() {
-    // Stub
   }
 
   loadModel(url, name) {
@@ -835,6 +897,22 @@ class App {
         session.removeEventListener('select', this.onSelectEventBound);
       }
     }
+  }
+
+  onTouchStart(event) {
+    // Stub - add logic if needed
+  }
+
+  onTouchMove(event) {
+    // Stub - add logic if needed
+  }
+
+  onTouchEnd(event) {
+    // Stub - add logic if needed
+  }
+
+  handlePointerMove(event) {
+    // Stub - add logic if needed
   }
 
   animate() {
