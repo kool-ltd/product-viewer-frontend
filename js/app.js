@@ -473,7 +473,7 @@ class App {
     this.rotateLeftBtn.onclick = () => this.rotateModel('y', -0.2);
     document.body.appendChild(this.rotateLeftBtn);
 
-    this.rotateRightBtn = document.createElement('button';
+    this.rotateRightBtn = document.createElement('button');
     this.rotateRightBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i>';
     this.rotateRightBtn.style.position = 'absolute';
     this.rotateRightBtn.style.bottom = '80px';
