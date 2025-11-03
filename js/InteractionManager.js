@@ -54,33 +54,34 @@ export class InteractionManager {
     this.orbitControls = new OrbitControls(this.camera, this.domElement);
     this.orbitControls.enableDamping = true;
     this.orbitControls.dampingFactor = 0.05;
-
-    // Store original handlers to restore later
-    this.originalOrbitHandlers = {
-      start: this.orbitControls._onMouseDown.bind(this.orbitControls),
-      move: this.orbitControls._onMouseMove.bind(this.orbitControls),
-      end: this.orbitControls._onMouseUp.bind(this.orbitControls)
-    };
+  
+    // Event handlers (will be assigned in enable/disable)
+    this.orbitStartHandler = null;
+    this.orbitChangeHandler = null;
+    this.orbitEndHandler = null;
   }
-
+  
   enableOrbitControls() {
     this.orbitControls.enabled = true;
-    this.domElement.addEventListener('mousedown', this.originalOrbitHandlers.start);
-    this.domElement.addEventListener('mousemove', this.originalOrbitHandlers.move);
-    this.domElement.addEventListener('mouseup', this.originalOrbitHandlers.end);
-    this.domElement.addEventListener('touchstart', this.originalOrbitHandlers.start);
-    this.domElement.addEventListener('touchmove', this.originalOrbitHandlers.move);
-    this.domElement.addEventListener('touchend', this.originalOrbitHandlers.end);
+  
+    // Define no-op handlers (safe to remove later)
+    this.orbitStartHandler = () => {};
+    this.orbitChangeHandler = () => {};
+    this.orbitEndHandler = () => {};
+  
+    this.orbitControls.addEventListener('start', this.orbitStartHandler);
+    this.orbitControls.addEventListener('change', this.orbitChangeHandler);
+    this.orbitControls.addEventListener('end', this.orbitEndHandler);
   }
-
+  
   disableOrbitControls() {
     this.orbitControls.enabled = false;
-    this.domElement.removeEventListener('mousedown', this.originalOrbitHandlers.start);
-    this.domElement.removeEventListener('mousemove', this.originalOrbitHandlers.move);
-    this.domElement.removeEventListener('mouseup', this.originalOrbitHandlers.end);
-    this.domElement.removeEventListener('touchstart', this.originalOrbitHandlers.start);
-    this.domElement.removeEventListener('touchmove', this.originalOrbitHandlers.move);
-    this.domElement.removeEventListener('touchend', this.originalOrbitHandlers.end);
+  
+    if (this.orbitStartHandler) {
+      this.orbitControls.removeEventListener('start', this.orbitStartHandler);
+      this.orbitControls.removeEventListener('change', this.orbitChangeHandler);
+      this.orbitControls.removeEventListener('end', this.orbitEndHandler);
+    }
   }
 
   // -------------------------------------------------------------------------
