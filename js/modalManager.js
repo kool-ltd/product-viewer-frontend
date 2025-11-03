@@ -1,3 +1,4 @@
+<DOCUMENT filename="modalManager.js">
 // modalManager.js
 
 let modalOverlay = null;
@@ -158,4 +159,4 @@ style.textContent = `
   font-weight: 400;
 }
 `;
-document.head.appendChild(style);
+document.head.appendChild(style);</DOCUMENT>
