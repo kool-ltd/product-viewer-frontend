@@ -282,7 +282,675 @@ class App {
     document.body.appendChild(overlay);
   }
 
-  // ...(truncated 24272 characters)...       const tempIntersects = [];
+  // -----------------------------------------------------------------------------
+  // Handle File Storage in the Browser (using IndexedDB)
+  // -----------------------------------------------------------------------------
+  initIndexedDB() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('3DModelViewer', 1);
+      
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains('models')) {
+          db.createObjectStore('models', { keyPath: 'name' });
+        }
+      };
+      
+      request.onsuccess = (event) => {
+        this.db = event.target.result;
+        resolve(this.db);
+      };
+      
+      request.onerror = (event) => {
+        console.error("IndexedDB error:", event.target.error);
+        reject(event.target.error);
+      };
+    });
+  }
+
+  saveModelToIndexedDB(name, fileBlob) {
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        reject(new Error("IndexedDB not initialized"));
+        return;
+      }
+      
+      const transaction = this.db.transaction(['models'], 'readwrite');
+      const store = transaction.objectStore('models');
+      const modelData = { name, data: fileBlob, date: new Date().toISOString() };
+      
+      const request = store.put(modelData);
+      
+      request.onsuccess = () => resolve();
+      request.onerror = (event) => reject(event.target.error);
+    });
+  }
+
+  getModelFromIndexedDB(name) {
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        reject(new Error("IndexedDB not initialized"));
+        return;
+      }
+      
+      const transaction = this.db.transaction(['models'], 'readonly');
+      const store = transaction.objectStore('models');
+      const request = store.get(name);
+      
+      request.onsuccess = () => {
+        if (request.result) {
+          resolve(request.result.data);
+        } else {
+          reject(new Error("Model not found"));
+        }
+      };
+      
+      request.onerror = (event) => reject(event.target.error);
+    });
+  }
+
+  listModelsFromIndexedDB() {
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        reject(new Error("IndexedDB not initialized"));
+        return;
+      }
+      
+      const transaction = this.db.transaction(['models'], 'readonly');
+      const store = transaction.objectStore('models');
+      const request = store.getAll();
+      
+      request.onsuccess = () => {
+        resolve(request.result.map(item => ({
+          name: item.name,
+          date: item.date
+        })));
+      };
+      
+      request.onerror = (event) => reject(event.target.error);
+    });
+  }
+
+  deleteModelFromIndexedDB(name) {
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        reject(new Error("IndexedDB not initialized"));
+        return;
+      }
+      
+      const transaction = this.db.transaction(['models'], 'readwrite');
+      const store = transaction.objectStore('models');
+      const request = store.delete(name);
+      
+      request.onsuccess = () => resolve();
+      request.onerror = (event) => reject(event.target.error);
+    });
+  }
+
+  // -----------------------------------------------------------------------------
+  // Browser-Based File Browser (using IndexedDB)
+  // -----------------------------------------------------------------------------
+  async showBrowseInterface() {
+    const loadingOverlay = document.getElementById('loading-overlay');
+    if (loadingOverlay) loadingOverlay.style.display = 'flex';
+    
+    try {
+        // Add console.log to debug
+        console.log('Fetching files.json...');
+        const response = await fetch('./assets/files.json');
+        console.log('Response:', response);
+        const data = await response.json();
+        console.log('Data:', data);
+        const files = data.models;
+        
+        if (loadingOverlay) loadingOverlay.style.display = 'none';
+
+        const modalOverlay = document.createElement('div');
+        modalOverlay.style.position = 'fixed';
+        modalOverlay.style.top = '0';
+        modalOverlay.style.left = '0';
+        modalOverlay.style.width = '100%';
+        modalOverlay.style.height = '100%';
+        modalOverlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
+        modalOverlay.style.display = 'flex';
+        modalOverlay.style.alignItems = 'center';
+        modalOverlay.style.justifyContent = 'center';
+        modalOverlay.style.zIndex = '10000';
+        
+        const modalContainer = document.createElement('div');
+        modalContainer.style.backgroundColor = 'white';
+        modalContainer.style.padding = '20px';
+        modalContainer.style.borderRadius = '8px';
+        modalContainer.style.minWidth = '300px';
+        modalContainer.style.maxHeight = '80%';
+        modalContainer.style.overflowY = 'auto';
+        
+        const title = document.createElement('h2');
+        title.textContent = 'Browse Models';
+        title.style.marginBottom = '10px';
+        modalContainer.appendChild(title);
+
+        const description = document.createElement('p');
+        if (!files || files.length === 0) {
+            description.textContent = 'No models found.';
+        } else {
+            description.textContent = `Select models (multiple selections allowed): `;
+        }
+        modalContainer.appendChild(description);
+        
+        const fileList = document.createElement('div');
+        fileList.style.marginTop = '10px';
+        
+        if (files && files.length > 0) {
+            files.forEach(file => {
+                const div = document.createElement('div');
+                div.style.marginBottom = '10px';
+                div.style.padding = '5px';
+                div.style.borderRadius = '4px';
+                div.style.backgroundColor = '#f5f5f5';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = file.url;
+                checkbox.id = file.name;
+                
+                const label = document.createElement('label');
+                label.htmlFor = file.name;
+                label.textContent = file.name;
+                label.style.marginLeft = '8px';
+                
+                div.appendChild(checkbox);
+                div.appendChild(label);
+                fileList.appendChild(div);
+            });
+        }
+        
+        modalContainer.appendChild(fileList);
+        
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.style.marginTop = '20px';
+        buttonsDiv.style.textAlign = 'right';
+        
+        const loadButton = document.createElement('button');
+        loadButton.textContent = 'Load Selected';
+        loadButton.style.backgroundColor = '#d00024';
+        loadButton.style.color = 'white';
+        loadButton.style.border = 'none';
+        loadButton.style.borderRadius = '9999px';
+        loadButton.style.padding = '10px 20px';
+        loadButton.style.cursor = 'pointer';
+
+
+
+        
+        const cancelButton = document.createElement('button');
+        cancelButton.textContent = 'Cancel';
+        cancelButton.style.backgroundColor = 'rgb(153, 153, 153)';
+        cancelButton.style.color = 'white';
+        cancelButton.style.border = 'none';
+        cancelButton.style.borderRadius = '9999px';
+        cancelButton.style.padding = '10px 20px';
+        cancelButton.style.cursor = 'pointer';
+        cancelButton.style.marginRight = '15px';
+
+
+        
+        buttonsDiv.appendChild(cancelButton);
+        buttonsDiv.appendChild(loadButton);
+        modalContainer.appendChild(buttonsDiv);
+        modalOverlay.appendChild(modalContainer);
+        document.body.appendChild(modalOverlay);
+        
+        loadButton.addEventListener('click', async () => {
+            const selected = [];
+            fileList.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                selected.push({ url: cb.value, name: cb.id });
+            });
+            
+            if(selected.length > 0) {
+                document.body.removeChild(modalOverlay);
+                
+                if (loadingOverlay) loadingOverlay.style.display = 'flex';
+                
+                this.clearExistingModels();
+                
+                for(const file of selected) {
+                    console.log('Loading model:', file.url);
+                    await this.loadModel(file.url, file.name.replace('.glb', '').replace('.gltf', ''));
+                }
+                
+                this.fitCameraToScene();
+                
+                if (loadingOverlay) loadingOverlay.style.display = 'none';
+            } else {
+                document.body.removeChild(modalOverlay);
+            }
+        });
+        
+        cancelButton.addEventListener('click', () => {
+            document.body.removeChild(modalOverlay);
+        });
+        
+    } catch (error) {
+        if (loadingOverlay) loadingOverlay.style.display = 'none';
+        console.error("Error fetching models:", error);
+        console.log("Full error details:", error);
+        alert("Error accessing models. Please check the console for details.");
+    }
+  }
+
+  // -----------------------------------------------------------------------------
+  // Pointer events 
+  // -----------------------------------------------------------------------------
+  handlePointerMove(event) {
+    this.pointerNDC.x = (event.clientX / window.innerWidth) * 2 - 1;
+    this.pointerNDC.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  }
+
+  // -----------------------------------------------------------------------------
+  // Touch Events for Model Rotation
+  // -----------------------------------------------------------------------------
+  onTouchStart(e) {
+    if (!this.isARMode) {
+        // Use existing non-AR touch handling
+        if (e.touches.length === 2 && this.productGroup && this.productGroup.visible) {
+            const dx = e.touches[1].clientX - e.touches[0].clientX;
+            const dy = e.touches[1].clientY - e.touches[0].clientY;
+            this.lastTouchAngle = Math.atan2(dy, dx);
+        }
+        return;
+    }
+    
+    // AR mode specific touch handling
+    if (e.touches.length === 1) {
+        // Single touch - track for Y-axis rotation
+        this.touchStartX = e.touches[0].clientX;
+        this.initialRotationY = this.productGroup ? this.productGroup.rotation.y : 0;
+        this.isSingleTouchRotating = true;
+    } 
+    else if (e.touches.length === 2) {
+        // Two finger touch - prepare for rotation
+        const dx = e.touches[1].clientX - e.touches[0].clientX;
+        const dy = e.touches[1].clientY - e.touches[0].clientY;
+        this.lastTouchAngle = Math.atan2(dy, dx);
+    }
+  }
+
+  onTouchMove(e) {
+    if (!this.isARMode) {
+        // Use existing non-AR touch handling
+        if (e.touches.length === 2 && this.lastTouchAngle !== null && 
+            this.productGroup && this.productGroup.visible) {
+            const dx = e.touches[1].clientX - e.touches[0].clientX;
+            const dy = e.touches[1].clientY - e.touches[0].clientY;
+            const currentAngle = Math.atan2(dy, dx);
+            const angleDiff = currentAngle - this.lastTouchAngle;
+            this.productGroup.rotation.y += angleDiff;
+            this.lastTouchAngle = currentAngle;
+            e.preventDefault();
+        }
+        return;
+    }
+    
+    // AR mode touch handling
+    if (this.productGroup && this.productGroup.visible) {
+        if (this.isSingleTouchRotating && e.touches.length === 1) {
+            // Single finger drag - rotate Y axis
+            const touchX = e.touches[0].clientX;
+            const touchDeltaX = touchX - this.touchStartX;
+            
+            // Scale the rotation (adjust sensitivity as needed)
+            const rotationFactor = 0.01;
+            this.productGroup.rotation.y = this.initialRotationY + (touchDeltaX * rotationFactor);
+            
+            e.preventDefault();
+        } 
+        else if (e.touches.length === 2 && this.lastTouchAngle !== null) {
+            // Two finger gesture - handle rotation
+            const dx = e.touches[1].clientX - e.touches[0].clientX;
+            const dy = e.touches[1].clientY - e.touches[0].clientY;
+            const currentAngle = Math.atan2(dy, dx);
+            const angleDiff = currentAngle - this.lastTouchAngle;
+            this.productGroup.rotation.y += angleDiff;
+            this.lastTouchAngle = currentAngle;
+            
+            e.preventDefault();
+        }
+    }
+  }
+
+  onTouchEnd(e) {
+    // Reset touch tracking variables
+    if (e.touches.length < 2) {
+        this.lastTouchAngle = null;
+    }
+    
+    if (e.touches.length === 0) {
+        this.isSingleTouchRotating = false;
+    }
+  }
+
+  // -----------------------------------------------------------------------------
+  // Loading Overlay (for both demo and upload)
+  // -----------------------------------------------------------------------------
+  createLoadingOverlay() {
+    let overlay = document.getElementById('loading-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'loading-overlay';
+      overlay.style.position = 'fixed';
+      overlay.style.top = '0';
+      overlay.style.left = '0';
+      overlay.style.width = '100%';
+      overlay.style.height = '100%';
+      overlay.style.backgroundColor = '#cccccc';
+      overlay.style.display = 'none';
+      overlay.style.flexDirection = 'column';
+      overlay.style.justifyContent = 'center';
+      overlay.style.alignItems = 'center';
+      overlay.style.zIndex = '9999';
+      overlay.innerHTML = `
+        <div id="loading-spinner" style="
+          border: 11px solid #d00024;
+          border-top: 11px solid #f3f3f3;
+          border-radius: 50%;
+          width: 84px;
+          height: 84px;
+          animation: spin 2s linear infinite;
+        "></div>
+        <div id="loading-text" style="
+          color: #333;
+          margin-top: 20px;
+          font-size: 14px;
+          font-family: sans-serif;
+        ">
+          Loading...
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      if (!document.getElementById('loading-overlay-style')) {
+        const style = document.createElement('style');
+        style.id = 'loading-overlay-style';
+        style.textContent = `
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    }
+  }
+
+  // -----------------------------------------------------------------------------
+  // Basic Initialization and Scene Setup
+  // -----------------------------------------------------------------------------
+  onWindowResize() {
+    if (this.camera && this.renderer) {
+      this.camera.aspect = window.innerWidth / window.innerHeight;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+  }
+
+  init() {
+    this.container = document.getElementById('scene-container');
+    this.scene = new THREE.Scene();
+
+    // Group for products (models)
+    this.productGroup = new THREE.Group();
+    this.scene.add(this.productGroup);
+
+    this.camera = new THREE.PerspectiveCamera(
+      75,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
+    this.camera.position.set(0, 0, 0);
+
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.renderer.shadowMap.enabled = true; // Enable shadow maps
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Use soft shadows
+    this.renderer.xr.enabled = true;
+    this.container.appendChild(this.renderer.domElement);
+    window.addEventListener('resize', this.onWindowResize.bind(this));
+  }
+
+  setupScene() {
+    this.scene.background = new THREE.Color(0xc0c0c1);
+    this.createFloor(); // Add floor immediately
+    this.rgbeLoader.load(
+      './assets/studio_small_09_1k.hdr',
+      (texture) => {
+        texture.mapping = THREE.EquirectangularReflectionMapping;
+        this.scene.environment = texture;
+        this.renderer.physicallyCorrectLights = true;
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 0.6;
+        this.renderer.outputEncoding = THREE.sRGBEncoding;
+      }
+    );
+  }
+
+  setupLights() {
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    this.scene.add(ambientLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(-5, 30, 5);
+    directionalLight.castShadow = true; // Enable shadow casting
+    
+    // Improve shadow quality
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    directionalLight.shadow.camera.near = 0.1;
+    directionalLight.shadow.camera.far = 50;
+    directionalLight.shadow.intensity = 5;
+    
+    // Adjust shadow camera frustum to fit your scene
+    const shadowSize = 10;
+    directionalLight.shadow.camera.left = -shadowSize;
+    directionalLight.shadow.camera.right = shadowSize;
+    directionalLight.shadow.camera.top = shadowSize;
+    directionalLight.shadow.camera.bottom = -shadowSize;
+    
+    // Fix shadow acne issues
+    directionalLight.shadow.bias = -0.0005;
+    directionalLight.shadow.normalBias = 0.02;
+
+    this.scene.add(directionalLight);
+
+    // Helper for debugging shadows (uncomment if needed)
+    // const helper = new THREE.CameraHelper(directionalLight.shadow.camera);
+    // this.scene.add(helper);
+
+    window.sceneLight = {
+      ambient: ambientLight,
+      directional: directionalLight
+    };
+  }
+
+  createFloor() {
+    // Create a floor plane
+    const floorGeometry = new THREE.PlaneGeometry(100, 100);
+    const floorMaterial = new THREE.MeshStandardMaterial({
+        color: 0xbbbbbb,
+        roughness: 0.8,
+        metalness: 0.2,
+        transparent: this.isARMode, // Transparent only in AR mode
+        opacity: this.isARMode ? 0.1 : 1.5 // Semi-transparent in AR mode
+    });
+    const browserFloorMaterial = new THREE.MeshStandardMaterial({
+      color: 0xfafafa, // Match the background color
+      roughness: 0.8,
+      metalness: 0.2
+    });
+    
+    this.floor = new THREE.Mesh(floorGeometry, 
+      this.isARMode ? floorMaterial : browserFloorMaterial);
+    this.floor.receiveShadow = true;
+    this.floor.rotation.x = -Math.PI / 2; // Rotate to be horizontal
+    
+    this.scene.add(this.floor);
+    return this.floor;
+  }
+
+  setupInitialControls() {
+    this.orbitControls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.orbitControls.rotateSpeed = 0.5;
+    this.orbitControls.enableDamping = true;
+    this.orbitControls.dampingFactor = 0.05;
+  }
+
+  updateDragControls() {
+    const draggableObjects = Array.from(this.loadedModels.values());
+    if (this.interactionManager) {
+        this.interactionManager.setDraggableObjects(draggableObjects);
+    }
+  }
+
+  clearExistingModels() {
+    this.loadedModels.forEach(model => {
+      if (model.parent) {
+        this.productGroup.remove(model);
+      }
+    });
+    this.loadedModels.clear();
+    this.draggableObjects.length = 0;
+    this.updateDragControls();
+  }
+
+  async loadDefaultProduct() {
+    const loadingOverlay = document.getElementById('loading-overlay');
+    if (loadingOverlay) {
+      loadingOverlay.style.display = 'flex';
+    }
+    this.clearExistingModels();
+    const parts = [
+      { name: 'blade', file: './assets/kool-mandoline-blade.glb' },
+      { name: 'frame', file: './assets/kool-mandoline-frame.glb' },
+      { name: 'handguard', file: './assets/ool-mandoline-handguard.glb' },
+      { name: 'handle', file: './assets/kool-mandoline-handletpe.glb' }
+    ];
+    
+    for (const part of parts) {
+      await new Promise((resolve, reject) => {
+        this.gltfLoader.load(
+          `assets/${part.file}`,
+          (gltf) => {
+            const model = gltf.scene;
+            const container = new THREE.Group();
+            container.name = part.name;
+            container.userData.isDraggable = true;
+            container.add(model);
+
+            container.raycast = function (raycaster, intersects) {
+              const box = new THREE.Box3().setFromObject(container);
+              if (!box.isEmpty()) {
+                const intersectionPoint = new THREE.Vector3();
+                if (raycaster.ray.intersectBox(box, intersectionPoint)) {
+                  const distance = raycaster.ray.origin.distanceTo(intersectionPoint);
+                  intersects.push({
+                    distance: distance,
+                    point: intersectionPoint.clone(),
+                    object: container
+                  });
+                }
+              }
+            };
+
+            this.draggableObjects.push(container);
+            this.productGroup.add(container);
+            this.loadedModels.set(part.name, container);
+            this.updateDragControls();
+            if (this.interactionManager) {
+              this.interactionManager.setDraggableObjects(Array.from(this.loadedModels.values()));
+            }
+            this.fitCameraToScene();
+            resolve();
+          },
+          undefined,
+          (error) => {
+            console.error(`Error loading model ${part.file}:`, error);
+            reject(error);
+          }
+        );
+      });
+    }
+    if (loadingOverlay) {
+      loadingOverlay.style.display = 'none';
+    }
+  }
+
+  fitCameraToScene() {
+    const box = new THREE.Box3().setFromObject(this.productGroup);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const fovRadians = this.camera.fov * (Math.PI / 180);
+    let distance = Math.abs(maxDim / Math.tan(fovRadians / 2));
+    distance *= 1.2;
+    
+    const offsetAngle = Math.PI / 4;
+    const xOffset = distance * Math.cos(offsetAngle);
+    const zOffset = distance * Math.sin(offsetAngle);
+    const yOffset = distance * 0.5;
+    
+    this.camera.position.set(center.x + xOffset, center.y + yOffset, center.z + zOffset);
+    this.orbitControls.target.copy(center);
+    this.camera.updateProjectionMatrix();
+    this.orbitControls.update();
+    
+    // Also reset the InteractionManager's orbit controls if they exist
+    if (this.interactionManager && this.interactionManager.orbitControls) {
+        this.interactionManager.orbitControls.target.copy(center);
+        this.interactionManager.orbitControls.update();
+    }
+  }
+
+  async loadModel(url, name) {
+    return new Promise((resolve, reject) => {
+        // For file uploads, save to IndexedDB when loading
+        if (url.startsWith('blob:')) {
+            fetch(url)
+                .then(response => response.blob())
+                .then(blob => {
+                    // Initialize IndexedDB if needed and save the model
+                    if (!this.db) {
+                        this.initIndexedDB()
+                            .then(db => {
+                                this.saveModelToIndexedDB(name, blob);
+                            })
+                            .catch(error => console.error("Error initializing IndexedDB:", error));
+                    } else {
+                        this.saveModelToIndexedDB(name, blob);
+                    }
+                })
+                .catch(error => console.error("Error saving model to IndexedDB:", error));
+        }
+        
+        this.gltfLoader.load(
+            url,
+            (gltf) => {
+                const model = gltf.scene;
+                // Set all meshes to cast shadows
+                model.traverse(node => {
+                  if (node.isMesh) {
+                    node.castShadow = true;
+                  }
+                });
+                const container = new THREE.Group();
+                container.name = name;
+                container.userData.isDraggable = true;
+                container.add(model);
+
+                // Custom raycast implementation
+                container.raycast = function(raycaster, intersects) {
+                    // Get all meshes inside this container
+                    const tempIntersects = [];
                     
                     // Perform direct intersection test with actual meshes inside this container
                     this.children.forEach(child => {
