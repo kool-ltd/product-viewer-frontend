@@ -188,7 +188,7 @@ export class InteractionManager {
     const intersectPoint = new THREE.Vector3();
     this.raycaster.ray.intersectPlane(plane, intersectPoint);
 
-    const delta = intersectPoint sub(this.lastDragPoint);
+    const delta = intersectPoint.clone().sub(this.lastDragPoint);
     this.selectedObject.position.add(delta);
     this.lastDragPoint = intersectPoint.clone();
   }
