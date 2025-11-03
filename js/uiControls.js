@@ -85,6 +85,17 @@ function showMaterialColorPicker(app) {
     originalColors.set(key, '#' + data.material.color.getHexString());
   });
 
+  // Store original opacities for all meshes
+  const originalOpacities = new Map();
+  app.productGroup.traverse((obj) => {
+    if (obj.isMesh) {
+      originalOpacities.set(obj, {
+        transparent: obj.material.transparent,
+        opacity: obj.material.opacity
+      });
+    }
+  });
+
   // Resize the scene container to upper part (65vh)
   const sceneContainer = document.getElementById('scene-container');
   sceneContainer.style.height = '65vh';
@@ -98,6 +109,7 @@ function showMaterialColorPicker(app) {
 
   // Create lower panel for color picker
   const panel = document.createElement('div');
+  panel.id = 'color-picker-panel';
   panel.style.position = 'fixed';
   panel.style.bottom = '0';
   panel.style.left = '0';
@@ -146,7 +158,7 @@ function showMaterialColorPicker(app) {
   
   // Recent colors section
   const recentColorsHeading = document.createElement('h4');
-  recentColorsHeading.textContent = 'Colors';
+  recentColorsHeading.textContent = 'Color History';
   recentColorsHeading.style.marginBottom = '10px';
   
   const recentColorsDiv = document.createElement('div');
@@ -219,17 +231,13 @@ function showMaterialColorPicker(app) {
     app.productGroup.traverse((obj) => {
       if (obj.isMesh) {
         if (!selectedMeshes.includes(obj)) {
-          if (obj.userData.originalTransparent === undefined) {
-            obj.userData.originalTransparent = obj.material.transparent;
-            obj.userData.originalOpacity = obj.material.opacity;
-          }
           obj.material.transparent = true;
           obj.material.opacity = 0.2;
           obj.material.needsUpdate = true;
         } else {
-          // Ensure selected are restored
-          obj.material.transparent = obj.userData.originalTransparent !== undefined ? obj.userData.originalTransparent : false;
-          obj.material.opacity = obj.userData.originalOpacity !== undefined ? obj.userData.originalOpacity : 1;
+          const orig = originalOpacities.get(obj);
+          obj.material.transparent = orig.transparent;
+          obj.material.opacity = orig.opacity;
           obj.material.needsUpdate = true;
         }
       }
@@ -239,12 +247,11 @@ function showMaterialColorPicker(app) {
   // Function to restore opacities
   function restoreOpacities() {
     app.productGroup.traverse((obj) => {
-      if (obj.isMesh && obj.userData.originalTransparent !== undefined) {
-        obj.material.transparent = obj.userData.originalTransparent;
-        obj.material.opacity = obj.userData.originalOpacity;
+      if (obj.isMesh && originalOpacities.has(obj)) {
+        const orig = originalOpacities.get(obj);
+        obj.material.transparent = orig.transparent;
+        obj.material.opacity = orig.opacity;
         obj.material.needsUpdate = true;
-        delete obj.userData.originalTransparent;
-        delete obj.userData.originalOpacity;
       }
     });
   }
@@ -254,8 +261,25 @@ function showMaterialColorPicker(app) {
   buttonsDiv.style.display = 'flex';
   buttonsDiv.style.justifyContent = 'space-between';
   
+  // Save button
+  const saveBtn = document.createElement('button');
+  saveBtn.textContent = 'Save';
+  saveBtn.style.backgroundColor = '#666';
+  saveBtn.style.color = 'white';
+  saveBtn.style.border = 'none';
+  saveBtn.style.borderRadius = '9999px';
+  saveBtn.style.padding = '8px 24px';
+  saveBtn.style.cursor = 'pointer';
+  saveBtn.style.marginRight = '15px';
+  saveBtn.addEventListener('click', () => {
+    const colorValue = colorInput.value;
+    addRecentColor(colorValue);
+    updateRecentColorsUI();
+  });
+  
   // Apply button
   const applyBtn = document.createElement('button');
+  applyBtn.className = 'color-apply-btn';
   applyBtn.textContent = 'Apply';
   applyBtn.style.backgroundColor = '#d00024';
   applyBtn.style.color = 'white';
@@ -314,6 +338,7 @@ function showMaterialColorPicker(app) {
   
   // Assemble the container
   buttonsDiv.appendChild(cancelBtn);
+  buttonsDiv.appendChild(saveBtn);
   buttonsDiv.appendChild(applyBtn);
   
   colorPickerWrapper.appendChild(colorInput);
@@ -445,7 +470,13 @@ function createColorButton(app) {
   });
   
   colorButton.addEventListener('click', () => {
-    showMaterialColorPicker(app);
+    const existingPanel = document.getElementById('color-picker-panel');
+    if (existingPanel) {
+      const apply = existingPanel.querySelector('.color-apply-btn');
+      if (apply) apply.click();
+    } else {
+      showMaterialColorPicker(app);
+    }
   });
   
   return colorButton;
