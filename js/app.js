@@ -10,38 +10,36 @@ import { showConfirmationModal } from './modalManager.js';
 
 class App {
   constructor() {
-    // ----- Shared Variables -----
+    // ----- Core state -----
     this.loadedModels = new Map();
     this.draggableObjects = [];
     this.isARMode = false;
     this.isVRMode = false;
+    this.isXRMode = false;
     this.isPlacingProduct = false;
-    this.isXRMode = false;               // AR or VR
-    this.selectionMode = false;          // colour-selection mode
-    this.selectedMaterial = null;        // material being coloured
+    this.selectionMode = false;
+    this.selectedMaterial = null;
     this.mouse = new THREE.Vector2();
     this.raycaster = new THREE.Raycaster();
 
-    // AR / VR UI elements
+    // AR/VR UI
     this.placementReticle = null;
     this.placementMessage = null;
     this.placeAgainButton = null;
     this.exitXRButton = null;
     this.hitTestSource = null;
 
-    // Touch rotation (desktop fallback)
+    // Touch fallback
     this.touchStartX = null;
     this.touchStartY = null;
-    this.initialRotationY = 0;
-    this.isSingleTouchRotating = false;
 
-    // Ensure FontAwesome is loaded
+    // FontAwesome
     this.ensureFontAwesomeLoaded();
 
-    // Loading overlay (with progress bar)
+    // Loading overlay
     this.createLoadingOverlay();
 
-    // Loading manager
+    // Loaders
     this.loadingManager = new THREE.LoadingManager();
     this.loadingManager.onProgress = (url, loaded, total) => {
       const fill = document.querySelector('#loading-overlay .progress-fill');
@@ -55,15 +53,16 @@ class App {
     this.gltfLoader = new GLTFLoader(this.loadingManager);
     this.rgbeLoader = new RGBELoader(this.loadingManager);
 
+    // Initialize scene
     this.init();
-    this.setupScene();
+    this.setupScene();        // FIXED: Added
     this.setupLights();
     this.setupInitialControls();
 
     // UI
     setupUIControls(this);
 
-    // File input (created in uiControls.js)
+    // File input
     const fileInput = document.querySelector('input[type="file"][accept=".glb,.gltf"]');
     if (fileInput) {
       fileInput.onchange = async (event) => {
@@ -80,35 +79,35 @@ class App {
 
         for (let file of files) {
           try {
-            const modelUrl = URL.createObjectURL(file);
+            const url = URL.createObjectURL(file);
             const name = file.name.replace(/\.glb$|\.gltf$/i, '');
-            await this.loadModel(modelUrl, name);
+            await this.loadModel(url, name);
           } catch (e) { console.error(e); }
         }
         if (overlay) overlay.style.display = 'none';
       };
     }
 
-    // Interaction manager (drag, XR controllers)
+    // Interaction
     this.interactionManager = new InteractionManager(
       this.scene, this.camera, this.renderer, this.renderer.domElement
     );
-    window.app = this;                     // for InteractionManager
+    window.app = this;
 
-    // Pointer / touch for colour selection
+    // Tap-to-select
     this.renderer.domElement.addEventListener('click', this.onPointerSelect.bind(this));
 
-    // XR session events
+    // XR events
     this.renderer.xr.addEventListener('sessionstart', this.onXRSessionStart.bind(this));
     this.renderer.xr.addEventListener('sessionend', this.onXRSessionEnd.bind(this));
 
-    // Show landing overlay first
+    // Start
     this.showLandingOverlay();
     this.animate();
   }
 
   // -------------------------------------------------------------------------
-  // Helpers
+  // Core Setup
   // -------------------------------------------------------------------------
   ensureFontAwesomeLoaded() {
     if (!document.querySelector('link[href*="font-awesome"]')) {
@@ -143,16 +142,11 @@ class App {
     document.body.appendChild(overlay);
   }
 
-  // -------------------------------------------------------------------------
-  // Scene / Camera / Renderer
-  // -------------------------------------------------------------------------
   init() {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0xc0c0c1);
 
-    this.camera = new THREE.PerspectiveCamera(
-      50, window.innerWidth / window.innerHeight, 0.1, 100
-    );
+    this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
     this.camera.position.set(0, 1.6, 3);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -167,6 +161,19 @@ class App {
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(window.innerWidth, window.innerHeight);
     });
+  }
+
+  setupScene() {
+    this.productGroup = null;
+    this.floor = null;
+
+    const floorGeometry = new THREE.PlaneGeometry(20, 20);
+    const floorMaterial = new THREE.ShadowMaterial({ opacity: 0.07 });
+    this.floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    this.floor.rotation.x = -Math.PI / 2;
+    this.floor.receiveShadow = true;
+    this.floor.visible = false;
+    this.scene.add(this.floor);
   }
 
   setupLights() {
@@ -186,7 +193,7 @@ class App {
   }
 
   // -------------------------------------------------------------------------
-  // Model loading
+  // Model Loading
   // -------------------------------------------------------------------------
   async loadModel(url, name) {
     return new Promise((resolve, reject) => {
@@ -196,22 +203,17 @@ class App {
           const model = gltf.scene;
           model.name = name;
 
-          // Store original scale on each top-level child
           model.traverse(child => {
-            if (child.isMesh) {
-              if (!child.material.userData.originalColor) {
-                child.material.userData.originalColor = '#' + child.material.color.getHexString();
-              }
+            if (child.isMesh && !child.material.userData.originalColor) {
+              child.material.userData.originalColor = '#' + child.material.color.getHexString();
             }
           });
 
-          // Container for dragging
           const container = new THREE.Group();
           container.name = name;
           container.add(model);
           container.userData.originalScale = new THREE.Vector3(1, 1, 1);
 
-          // Raycast helper for containers
           container.raycast = function (raycaster, intersects) {
             const temp = [];
             this.children.forEach(child => {
@@ -267,7 +269,6 @@ class App {
     const box = new THREE.Box3().setFromObject(this.productGroup);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
-
     const maxDim = Math.max(size.x, size.y, size.z);
     const distance = maxDim * 2.5;
     const direction = new THREE.Vector3()
@@ -281,7 +282,7 @@ class App {
   }
 
   // -------------------------------------------------------------------------
-  // Colour selection (tap-to-select)
+  // Tap-to-Select Color
   // -------------------------------------------------------------------------
   onPointerSelect(event) {
     if (!this.selectionMode) return;
@@ -297,17 +298,15 @@ class App {
       const mat = hits[0].object.material;
       this.selectedMaterial = mat;
 
-      // Highlight
       mat.userData._tempEmissive = mat.emissive.clone();
       mat.emissive.set(0x555555);
 
-      // Open picker
       import('./uiControls.js').then(mod => mod.showMaterialColorPicker(this));
     }
   }
 
   // -------------------------------------------------------------------------
-  // XR (AR + VR) handling
+  // XR Session Handling
   // -------------------------------------------------------------------------
   onXRSessionStart() {
     const session = this.renderer.xr.getSession();
@@ -315,26 +314,21 @@ class App {
     this.isARMode = session.mode === 'immersive-ar';
     this.isVRMode = session.mode === 'immersive-vr';
 
-    // Background
     this.scene.background = null;
 
-    // Floor (only AR)
     if (this.isARMode) {
       this.isPlacingProduct = true;
       if (this.productGroup) this.productGroup.visible = false;
       this.createPlacementUI();
       this.placementMessage.style.display = 'block';
     } else {
-      // VR – show model immediately
       if (this.productGroup) this.productGroup.visible = true;
     }
 
-    // Exit button
     if (!this.exitXRButton) this.createExitXRButton();
     this.exitXRButton.style.display = 'block';
     this.exitXRButton.textContent = this.isARMode ? 'Exit AR' : 'Exit VR';
 
-    // Hit-test only for AR
     if (this.isARMode && !this.hitTestSource) {
       session.requestReferenceSpace('local-floor')
         .catch(() => session.requestReferenceSpace('viewer'))
@@ -342,7 +336,6 @@ class App {
         .then(src => this.hitTestSource = src);
     }
 
-    // Bind select for placement (AR only)
     if (this.isARMode) {
       this._selectBound = this.onSelectEvent.bind(this);
       session.addEventListener('select', this._selectBound);
@@ -393,7 +386,7 @@ class App {
   }
 
   // -------------------------------------------------------------------------
-  // AR placement UI
+  // AR UI
   // -------------------------------------------------------------------------
   createPlacementUI() {
     // Reticle
@@ -427,7 +420,7 @@ class App {
     this.placementMessage.style.display = 'none';
     document.body.appendChild(this.placementMessage);
 
-    // Place-again button
+    // Place again
     this.placeAgainButton = document.createElement('button');
     this.placeAgainButton.textContent = 'Place Again';
     this.placeAgainButton.style.position = 'absolute';
@@ -458,7 +451,7 @@ class App {
     };
     document.body.appendChild(this.placeAgainButton);
 
-    // Rotation buttons (AR only)
+    // Rotation buttons
     this.createARRotationControls();
   }
 
@@ -480,7 +473,7 @@ class App {
     this.rotateLeftBtn.onclick = () => this.rotateModel('y', -0.2);
     document.body.appendChild(this.rotateLeftBtn);
 
-    this.rotateRightBtn = document.createElement('button');
+    this.rotateRightBtn = document.createElement('button';
     this.rotateRightBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i>';
     this.rotateRightBtn.style.position = 'absolute';
     this.rotateRightBtn.style.bottom = '80px';
@@ -503,7 +496,6 @@ class App {
     if (axis === 'y') this.productGroup.rotation.y += angle;
   }
 
-  // AR tap-to-place
   onSelectEvent(event) {
     if (!this.isPlacingProduct || !this.hitTestSource) return;
     const frame = event.frame;
@@ -523,7 +515,6 @@ class App {
       pose.transform.position.z
     );
 
-    // Floor
     if (this.floor) {
       this.floor.position.copy(this.productGroup.position);
       this.floor.position.y = pose.transform.position.y;
@@ -542,7 +533,7 @@ class App {
   }
 
   // -------------------------------------------------------------------------
-  // Browse interface (demo models)
+  // Browse Interface
   // -------------------------------------------------------------------------
   showBrowseInterface() {
     const overlay = document.createElement('div');
@@ -595,7 +586,7 @@ class App {
   }
 
   // -------------------------------------------------------------------------
-  // Landing overlay
+  // Landing Overlay
   // -------------------------------------------------------------------------
   showLandingOverlay() {
     const overlay = document.createElement('div');
@@ -644,22 +635,17 @@ class App {
   }
 
   // -------------------------------------------------------------------------
-  // Animation loop
+  // Animation Loop
   // -------------------------------------------------------------------------
   animate() {
     this.renderer.setAnimationLoop((time, frame) => {
-      // AR reticle update
       if (this.isARMode && this.isPlacingProduct && this.hitTestSource && frame) {
         const ref = this.renderer.xr.getReferenceSpace();
         const hits = frame.getHitTestResults(this.hitTestSource);
         if (hits.length) {
           const pose = hits[0].getPose(ref);
           this.placementReticle.visible = true;
-          this.placementReticle.position.set(
-            pose.transform.position.x,
-            pose.transform.position.y,
-            pose.transform.position.z
-          );
+          this.placementReticle.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
         } else {
           this.placementReticle.visible = false;
         }
@@ -672,8 +658,5 @@ class App {
   }
 }
 
-// -------------------------------------------------------------------------
-// Export
-// -------------------------------------------------------------------------
 const app = new App();
 export default app;
