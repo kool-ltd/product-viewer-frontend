@@ -54,12 +54,14 @@ function getMaterialsByName(app) {
             material.userData.originalColor = '#' + material.color.getHexString();
           }
           
-          // Store with reference to the mesh and material for later updating
-          materialMap.set(fullName, {
-            model: modelName,
-            mesh: child,
-            material: material
-          });
+          if (!materialMap.has(fullName)) {
+            materialMap.set(fullName, {
+              model: modelName,
+              meshes: [],
+              material: material
+            });
+          }
+          materialMap.get(fullName).meshes.push(child);
         });
       }
     });
@@ -83,10 +85,16 @@ function showMaterialColorPicker(app) {
     originalColors.set(key, '#' + data.material.color.getHexString());
   });
 
-  // Resize the scene container to upper half
+  // Resize the scene container to upper part (3:1 ratio)
   const sceneContainer = document.getElementById('scene-container');
-  sceneContainer.style.height = '50vh';
+  sceneContainer.style.height = '75vh';
   sceneContainer.style.top = '0';
+
+  // Update renderer and camera to fit the new size
+  app.renderer.setSize(sceneContainer.clientWidth, sceneContainer.clientHeight);
+  app.camera.aspect = sceneContainer.clientWidth / sceneContainer.clientHeight;
+  app.camera.updateProjectionMatrix();
+  app.fitCameraToScene();
 
   // Create lower panel for color picker
   const panel = document.createElement('div');
@@ -94,7 +102,7 @@ function showMaterialColorPicker(app) {
   panel.style.bottom = '0';
   panel.style.left = '0';
   panel.style.width = '100%';
-  panel.style.height = '50vh';
+  panel.style.height = '25vh';
   panel.style.backgroundColor = 'white';
   panel.style.zIndex = '10000';
   panel.style.overflowY = 'auto';
@@ -205,16 +213,21 @@ function showMaterialColorPicker(app) {
   }
 
   // Function to dim non-selected meshes
-  function dimNonSelected(selectedMesh) {
+  function dimNonSelected(selectedMeshes) {
     app.productGroup.traverse((obj) => {
       if (obj.isMesh) {
-        if (obj.userData.originalTransparent === undefined) {
-          obj.userData.originalTransparent = obj.material.transparent;
-          obj.userData.originalOpacity = obj.material.opacity;
-        }
-        if (obj !== selectedMesh) {
+        if (!selectedMeshes.includes(obj)) {
+          if (obj.userData.originalTransparent === undefined) {
+            obj.userData.originalTransparent = obj.material.transparent;
+            obj.userData.originalOpacity = obj.material.opacity;
+          }
           obj.material.transparent = true;
           obj.material.opacity = 0.3;
+          obj.material.needsUpdate = true;
+        } else {
+          // Ensure selected are restored
+          obj.material.transparent = obj.userData.originalTransparent !== undefined ? obj.userData.originalTransparent : false;
+          obj.material.opacity = obj.userData.originalOpacity !== undefined ? obj.userData.originalOpacity : 1;
           obj.material.needsUpdate = true;
         }
       }
@@ -262,6 +275,10 @@ function showMaterialColorPicker(app) {
     // Close the panel
     document.body.removeChild(panel);
     sceneContainer.style.height = '100%';
+    app.renderer.setSize(window.innerWidth, window.innerHeight);
+    app.camera.aspect = window.innerWidth / window.innerHeight;
+    app.camera.updateProjectionMatrix();
+    app.fitCameraToScene();
   });
   
   // Cancel button
@@ -287,6 +304,10 @@ function showMaterialColorPicker(app) {
     // Close the panel
     document.body.removeChild(panel);
     sceneContainer.style.height = '100%';
+    app.renderer.setSize(window.innerWidth, window.innerHeight);
+    app.camera.aspect = window.innerWidth / window.innerHeight;
+    app.camera.updateProjectionMatrix();
+    app.fitCameraToScene();
   });
   
   // Assemble the container
@@ -315,7 +336,7 @@ function showMaterialColorPicker(app) {
   const initialMaterialKey = materialSelect.value;
   const initialMaterialData = materialMap.get(initialMaterialKey);
   if (initialMaterialData) {
-    dimNonSelected(initialMaterialData.mesh);
+    dimNonSelected(initialMaterialData.meshes);
   }
   
   // Update when material changes
@@ -326,7 +347,7 @@ function showMaterialColorPicker(app) {
     const selectedMaterialKey = materialSelect.value;
     const materialData = materialMap.get(selectedMaterialKey);
     if (materialData) {
-      dimNonSelected(materialData.mesh);
+      dimNonSelected(materialData.meshes);
     }
   });
 
