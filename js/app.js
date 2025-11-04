@@ -420,9 +420,18 @@ class App {
       modalContainer.style.backgroundColor = 'white';
       modalContainer.style.padding = '20px';
       modalContainer.style.borderRadius = '8px';
-      modalContainer.style.minWidth = '300px';
-      modalContainer.style.maxHeight = '80%';
+      modalContainer.style.width = '90%';
+      modalContainer.style.maxWidth = '1200px';
+      modalContainer.style.maxHeight = '90vh';
       modalContainer.style.overflowY = 'auto';
+  
+      // On mobile, make full screen
+      if (window.innerWidth < 768) {
+        modalContainer.style.width = '100vw';
+        modalContainer.style.height = '100vh';
+        modalContainer.style.borderRadius = '0';
+        modalContainer.style.padding = '10px';
+      }
   
       const title = document.createElement('h2');
       title.textContent = 'Browse Models';
@@ -434,7 +443,7 @@ class App {
       } else {
         description.textContent = `Select models (multiple selections allowed): `;
       }
-      description.style.marginBottom = '20px';
+      description.style.marginBottom = '30px';
       modalContainer.appendChild(description);
   
       // ----------------------------------------------------------------
@@ -444,7 +453,7 @@ class App {
       grid.style.cssText = `
         display:grid;
         grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
-        gap:20px;margin-bottom:20px;
+        gap:20px;margin-bottom:30px;
       `;
   
       // ----------------------------------------------------------------
@@ -458,11 +467,11 @@ class App {
       thumbRenderer.setSize(thumbSize, thumbSize);
       thumbRenderer.setClearColor(0x000000, 0);   // transparent bg
   
-      // simple white directional light
-      const light = new THREE.DirectionalLight(0xffffff, 1);
+      // simple white directional light (brighter)
+      const light = new THREE.DirectionalLight(0xffffff, 1.5);
       light.position.set(5, 10, 7);
       thumbScene.add(light);
-      thumbScene.add(new THREE.AmbientLight(0x404040));
+      thumbScene.add(new THREE.AmbientLight(0x404040, 1.2));
   
       async function makeThumbnail(url) {
         if (thumbCache.has(url)) return thumbCache.get(url);
@@ -548,7 +557,7 @@ class App {
           name.textContent = file.name;
           name.style.cssText = `
             margin:0;padding:8px 0;background:#f5f5f5;
-            font-weight:600;font-size:14px;
+            font-weight:600;font-size:14px;text-align:center;
           `;
   
           card.appendChild(checkbox);
@@ -568,8 +577,8 @@ class App {
       modalContainer.appendChild(grid);
   
       const buttonsDiv = document.createElement('div');
-      buttonsDiv.style.marginTop = '20px';
-      buttonsDiv.style.textAlign = 'right';
+      buttonsDiv.style.marginTop = '30px';
+      buttonsDiv.style.textAlign = 'center';
   
       const loadButton = document.createElement('button');
       loadButton.textContent = 'Load Selected';
