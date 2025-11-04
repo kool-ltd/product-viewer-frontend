@@ -434,6 +434,7 @@ class App {
       } else {
         description.textContent = `Select models (multiple selections allowed): `;
       }
+      description.style.marginBottom = '20px';
       modalContainer.appendChild(description);
   
       // ----------------------------------------------------------------
@@ -478,7 +479,10 @@ class App {
         const fitDist = maxDim * 2.5;
   
         model.position.sub(center);               // centre the model
-        thumbCamera.position.set(0, 0, fitDist);
+  
+        // Isometric view (45° from top-right)
+        const angle = Math.PI / 4;  // 45 degrees
+        thumbCamera.position.set(fitDist * Math.sin(angle), fitDist / 2, fitDist * Math.cos(angle));
         thumbCamera.lookAt(0, 0, 0);
   
         thumbScene.add(model);
@@ -549,6 +553,13 @@ class App {
   
           card.appendChild(checkbox);
           card.appendChild(name);
+  
+          // Make entire card clickable to toggle checkbox
+          card.addEventListener('click', (e) => {
+            if (e.target !== checkbox) {
+              checkbox.checked = !checkbox.checked;
+            }
+          });
   
           grid.appendChild(card);
         });
