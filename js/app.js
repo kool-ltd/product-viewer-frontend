@@ -409,7 +409,7 @@ class App {
       modalOverlay.style.top = '0';
       modalOverlay.style.left = '0';
       modalOverlay.style.width = '100%';
-      modalOverlay.style.height = '100%';
+      modalOverlay.style.height = '100dvh';
       modalOverlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
       modalOverlay.style.display = 'flex';
       modalOverlay.style.alignItems = 'center';
@@ -420,17 +420,16 @@ class App {
       modalContainer.style.backgroundColor = 'white';
       modalContainer.style.padding = '20px';
       modalContainer.style.borderRadius = '8px';
-      modalContainer.style.width = '90%';
-      modalContainer.style.maxWidth = '1200px';
-      modalContainer.style.maxHeight = '90vh';
+      modalContainer.style.minWidth = '300px';
+      modalContainer.style.maxHeight = '80%';
       modalContainer.style.overflowY = 'auto';
   
       // On mobile, make full screen
       if (window.innerWidth < 768) {
         modalContainer.style.width = '100vw';
-        modalContainer.style.height = '100vh';
+        modalContainer.style.height = '100dvh';
         modalContainer.style.borderRadius = '0';
-        modalContainer.style.padding = '10px';
+        modalContainer.style.padding = '20px';
       }
   
       const title = document.createElement('h2');
