@@ -388,154 +388,238 @@ class App {
   }
 
   // -----------------------------------------------------------------------------
-  // Browser-Based File Browser (using IndexedDB)
+  // Browser-Based File Browser 
   // -----------------------------------------------------------------------------
   async showBrowseInterface() {
     const loadingOverlay = document.getElementById('loading-overlay');
     if (loadingOverlay) loadingOverlay.style.display = 'flex';
-    
+  
     try {
-        // Add console.log to debug
-        console.log('Fetching files.json...');
-        const response = await fetch('./assets/files.json');
-        console.log('Response:', response);
-        const data = await response.json();
-        console.log('Data:', data);
-        const files = data.models;
-        
-        if (loadingOverlay) loadingOverlay.style.display = 'none';
-
-        const modalOverlay = document.createElement('div');
-        modalOverlay.style.position = 'fixed';
-        modalOverlay.style.top = '0';
-        modalOverlay.style.left = '0';
-        modalOverlay.style.width = '100%';
-        modalOverlay.style.height = '100%';
-        modalOverlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
-        modalOverlay.style.display = 'flex';
-        modalOverlay.style.alignItems = 'center';
-        modalOverlay.style.justifyContent = 'center';
-        modalOverlay.style.zIndex = '10000';
-        
-        const modalContainer = document.createElement('div');
-        modalContainer.style.backgroundColor = 'white';
-        modalContainer.style.padding = '20px';
-        modalContainer.style.borderRadius = '8px';
-        modalContainer.style.minWidth = '300px';
-        modalContainer.style.maxHeight = '80%';
-        modalContainer.style.overflowY = 'auto';
-        
-        const title = document.createElement('h2');
-        title.textContent = 'Browse Models';
-        title.style.marginBottom = '10px';
-        modalContainer.appendChild(title);
-
-        const description = document.createElement('p');
-        if (!files || files.length === 0) {
-            description.textContent = 'No models found.';
+      // Add console.log to debug
+      console.log('Fetching files.json...');
+      const response = await fetch('./assets/files.json');
+      console.log('Response:', response);
+      const data = await response.json();
+      console.log('Data:', data);
+      const files = data.models;
+  
+      if (loadingOverlay) loadingOverlay.style.display = 'none';
+      const modalOverlay = document.createElement('div');
+      modalOverlay.style.position = 'fixed';
+      modalOverlay.style.top = '0';
+      modalOverlay.style.left = '0';
+      modalOverlay.style.width = '100%';
+      modalOverlay.style.height = '100%';
+      modalOverlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
+      modalOverlay.style.display = 'flex';
+      modalOverlay.style.alignItems = 'center';
+      modalOverlay.style.justifyContent = 'center';
+      modalOverlay.style.zIndex = '10000';
+  
+      const modalContainer = document.createElement('div');
+      modalContainer.style.backgroundColor = 'white';
+      modalContainer.style.padding = '20px';
+      modalContainer.style.borderRadius = '8px';
+      modalContainer.style.minWidth = '300px';
+      modalContainer.style.maxHeight = '80%';
+      modalContainer.style.overflowY = 'auto';
+  
+      const title = document.createElement('h2');
+      title.textContent = 'Browse Models';
+      title.style.marginBottom = '10px';
+      modalContainer.appendChild(title);
+      const description = document.createElement('p');
+      if (!files || files.length === 0) {
+        description.textContent = 'No models found.';
+      } else {
+        description.textContent = `Select models (multiple selections allowed): `;
+      }
+      modalContainer.appendChild(description);
+  
+      // ----------------------------------------------------------------
+      // Grid container – 3 columns (auto-fit fallback)
+      // ----------------------------------------------------------------
+      const grid = document.createElement('div');
+      grid.style.cssText = `
+        display:grid;
+        grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+        gap:20px;margin-bottom:20px;
+      `;
+  
+      // ----------------------------------------------------------------
+      // Helper: tiny off-screen renderer for thumbnails
+      // ----------------------------------------------------------------
+      const thumbCache = new Map();               // url → dataURL
+      const thumbSize = 150;
+      const thumbScene = new THREE.Scene();
+      const thumbCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+      const thumbRenderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+      thumbRenderer.setSize(thumbSize, thumbSize);
+      thumbRenderer.setClearColor(0x000000, 0);   // transparent bg
+  
+      // simple white directional light
+      const light = new THREE.DirectionalLight(0xffffff, 1);
+      light.position.set(5, 10, 7);
+      thumbScene.add(light);
+      thumbScene.add(new THREE.AmbientLight(0x404040));
+  
+      async function makeThumbnail(url) {
+        if (thumbCache.has(url)) return thumbCache.get(url);
+  
+        // Load the GLB (reuse the same loader you already have in the app)
+        const gltf = await this.gltfLoader.loadAsync(url);
+        const model = gltf.scene;
+  
+        // Fit model in the tiny view
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fitDist = maxDim * 2.5;
+  
+        model.position.sub(center);               // centre the model
+        thumbCamera.position.set(0, 0, fitDist);
+        thumbCamera.lookAt(0, 0, 0);
+  
+        thumbScene.add(model);
+        thumbRenderer.render(thumbScene, thumbCamera);
+        const dataURL = thumbRenderer.domElement.toDataURL('image/png');
+  
+        // clean up
+        thumbScene.remove(model);
+        model.traverse(child => {
+          if (child.isMesh) {
+            child.geometry?.dispose();
+            child.material?.dispose();
+          }
+        });
+  
+        thumbCache.set(url, dataURL);
+        return dataURL;
+      }
+  
+      // ----------------------------------------------------------------
+      // Build a card for every model
+      // ----------------------------------------------------------------
+      if (files && files.length > 0) {
+        files.forEach(async file => {
+          const card = document.createElement('div');
+          card.style.cssText = `
+            cursor:pointer;box-shadow:0 4px 8px rgba(0,0,0,0.1);
+            border-radius:8px;overflow:hidden;transition:transform .2s;
+            background:#f5f5f5;position:relative;
+          `;
+          card.onmouseover = () => card.style.transform = 'scale(1.05)';
+          card.onmouseout  = () => card.style.transform = 'scale(1)';
+  
+          // checkbox in top-right corner
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.value = file.url;
+          checkbox.id = file.name;
+          checkbox.style.position = 'absolute';
+          checkbox.style.top = '10px';
+          checkbox.style.right = '10px';
+          checkbox.style.zIndex = '1';
+          checkbox.style.margin = '0';
+  
+          // placeholder while thumbnail loads
+          const placeholder = document.createElement('div');
+          placeholder.style.cssText = `
+            width:100%;height:${thumbSize}px;background:#e0e0e0;
+            display:flex;align-items:center;justify-content:center;
+            font-size:12px;color:#777;
+          `;
+          placeholder.textContent = 'Loading…';
+          card.appendChild(placeholder);
+  
+          // generate thumbnail (async)
+          const thumbURL = await makeThumbnail.call(this, file.url);
+          const img = new Image();
+          img.src = thumbURL;
+          img.style.cssText = 'width:100%;height:auto;display:block;';
+          card.replaceChild(img, placeholder);
+  
+          const name = document.createElement('p');
+          name.textContent = file.name;
+          name.style.cssText = `
+            margin:0;padding:8px 0;background:#f5f5f5;
+            font-weight:600;font-size:14px;
+          `;
+  
+          card.appendChild(checkbox);
+          card.appendChild(name);
+  
+          grid.appendChild(card);
+        });
+      }
+  
+      modalContainer.appendChild(grid);
+  
+      const buttonsDiv = document.createElement('div');
+      buttonsDiv.style.marginTop = '20px';
+      buttonsDiv.style.textAlign = 'right';
+  
+      const loadButton = document.createElement('button');
+      loadButton.textContent = 'Load Selected';
+      loadButton.style.backgroundColor = '#d00024';
+      loadButton.style.color = 'white';
+      loadButton.style.border = 'none';
+      loadButton.style.borderRadius = '9999px';
+      loadButton.style.padding = '10px 20px';
+      loadButton.style.cursor = 'pointer';
+  
+      const cancelButton = document.createElement('button');
+      cancelButton.textContent = 'Cancel';
+      cancelButton.style.backgroundColor = 'rgb(153, 153, 153)';
+      cancelButton.style.color = 'white';
+      cancelButton.style.border = 'none';
+      cancelButton.style.borderRadius = '9999px';
+      cancelButton.style.padding = '10px 20px';
+      cancelButton.style.cursor = 'pointer';
+      cancelButton.style.marginRight = '15px';
+  
+      buttonsDiv.appendChild(cancelButton);
+      buttonsDiv.appendChild(loadButton);
+      modalContainer.appendChild(buttonsDiv);
+      modalOverlay.appendChild(modalContainer);
+      document.body.appendChild(modalOverlay);
+  
+      loadButton.addEventListener('click', async () => {
+        const selected = [];
+        grid.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+          selected.push({ url: cb.value, name: cb.id });
+        });
+  
+        if (selected.length > 0) {
+          document.body.removeChild(modalOverlay);
+  
+          if (loadingOverlay) loadingOverlay.style.display = 'flex';
+  
+          this.clearExistingModels();
+  
+          for (const file of selected) {
+            console.log('Loading model:', file.url);
+            await this.loadModel(file.url, file.name.replace('.glb', '').replace('.gltf', ''));
+          }
+  
+          this.fitCameraToScene();
+  
+          if (loadingOverlay) loadingOverlay.style.display = 'none';
         } else {
-            description.textContent = `Select models (multiple selections allowed): `;
+          document.body.removeChild(modalOverlay);
         }
-        modalContainer.appendChild(description);
-        
-        const fileList = document.createElement('div');
-        fileList.style.marginTop = '10px';
-        
-        if (files && files.length > 0) {
-            files.forEach(file => {
-                const div = document.createElement('div');
-                div.style.marginBottom = '10px';
-                div.style.padding = '5px';
-                div.style.borderRadius = '4px';
-                div.style.backgroundColor = '#f5f5f5';
-                
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.value = file.url;
-                checkbox.id = file.name;
-                
-                const label = document.createElement('label');
-                label.htmlFor = file.name;
-                label.textContent = file.name;
-                label.style.marginLeft = '8px';
-                
-                div.appendChild(checkbox);
-                div.appendChild(label);
-                fileList.appendChild(div);
-            });
-        }
-        
-        modalContainer.appendChild(fileList);
-        
-        const buttonsDiv = document.createElement('div');
-        buttonsDiv.style.marginTop = '20px';
-        buttonsDiv.style.textAlign = 'right';
-        
-        const loadButton = document.createElement('button');
-        loadButton.textContent = 'Load Selected';
-        loadButton.style.backgroundColor = '#d00024';
-        loadButton.style.color = 'white';
-        loadButton.style.border = 'none';
-        loadButton.style.borderRadius = '9999px';
-        loadButton.style.padding = '10px 20px';
-        loadButton.style.cursor = 'pointer';
-
-
-
-        
-        const cancelButton = document.createElement('button');
-        cancelButton.textContent = 'Cancel';
-        cancelButton.style.backgroundColor = 'rgb(153, 153, 153)';
-        cancelButton.style.color = 'white';
-        cancelButton.style.border = 'none';
-        cancelButton.style.borderRadius = '9999px';
-        cancelButton.style.padding = '10px 20px';
-        cancelButton.style.cursor = 'pointer';
-        cancelButton.style.marginRight = '15px';
-
-
-        
-        buttonsDiv.appendChild(cancelButton);
-        buttonsDiv.appendChild(loadButton);
-        modalContainer.appendChild(buttonsDiv);
-        modalOverlay.appendChild(modalContainer);
-        document.body.appendChild(modalOverlay);
-        
-        loadButton.addEventListener('click', async () => {
-            const selected = [];
-            fileList.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
-                selected.push({ url: cb.value, name: cb.id });
-            });
-            
-            if(selected.length > 0) {
-                document.body.removeChild(modalOverlay);
-                
-                if (loadingOverlay) loadingOverlay.style.display = 'flex';
-                
-                this.clearExistingModels();
-                
-                for(const file of selected) {
-                    console.log('Loading model:', file.url);
-                    await this.loadModel(file.url, file.name.replace('.glb', '').replace('.gltf', ''));
-                }
-                
-                this.fitCameraToScene();
-                
-                if (loadingOverlay) loadingOverlay.style.display = 'none';
-            } else {
-                document.body.removeChild(modalOverlay);
-            }
-        });
-        
-        cancelButton.addEventListener('click', () => {
-            document.body.removeChild(modalOverlay);
-        });
-        
+      });
+  
+      cancelButton.addEventListener('click', () => {
+        document.body.removeChild(modalOverlay);
+      });
+  
     } catch (error) {
-        if (loadingOverlay) loadingOverlay.style.display = 'none';
-        console.error("Error fetching models:", error);
-        console.log("Full error details:", error);
-        alert("Error accessing models. Please check the console for details.");
+      if (loadingOverlay) loadingOverlay.style.display = 'none';
+      console.error("Error fetching models:", error);
+      console.log("Full error details:", error);
+      alert("Error accessing models. Please check the console for details.");
     }
   }
 
