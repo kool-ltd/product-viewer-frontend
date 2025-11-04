@@ -82,7 +82,7 @@ function fitPreservingView(app) {
 
   const fitHeightDistance = maxSize / (2 * Math.tan(app.camera.fov * Math.PI / 360));
   const fitWidthDistance = fitHeightDistance / app.camera.aspect;
-  const newDistance = 1.2 * Math.max(fitHeightDistance, fitWidthDistance);
+  const newDistance = 2 * Math.max(fitHeightDistance, fitWidthDistance);
 
   app.camera.position.copy(app.orbitControls.target.clone().sub(currentDir.multiplyScalar(newDistance)));
   app.camera.lookAt(app.orbitControls.target);
