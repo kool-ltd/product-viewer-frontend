@@ -403,7 +403,17 @@ class App {
       console.log('Data:', data);
       const files = data.models;
   
+      // Generate all thumbnails in parallel before showing the modal
+      const thumbPromises = files.map(async (file) => {
+        const thumbURL = await makeThumbnail.call(this, file.url);
+        return { file, thumbURL };
+      });
+  
+      const thumbs = await Promise.all(thumbPromises);
+  
+      // Now hide loading after thumbnails are ready
       if (loadingOverlay) loadingOverlay.style.display = 'none';
+  
       const modalOverlay = document.createElement('div');
       modalOverlay.style.position = 'fixed';
       modalOverlay.style.top = '0';
@@ -456,65 +466,10 @@ class App {
       `;
   
       // ----------------------------------------------------------------
-      // Helper: tiny off-screen renderer for thumbnails
-      // ----------------------------------------------------------------
-      const thumbCache = new Map();               // url → dataURL
-      const thumbSize = 150;
-      const thumbScene = new THREE.Scene();
-      const thumbCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
-      const thumbRenderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
-      thumbRenderer.setSize(thumbSize, thumbSize);
-      thumbRenderer.setClearColor(0x000000, 0);   // transparent bg
-  
-      // simple white directional light (brighter)
-      const light = new THREE.DirectionalLight(0xffffff, 1.5);
-      light.position.set(5, 10, 7);
-      thumbScene.add(light);
-      thumbScene.add(new THREE.AmbientLight(0x404040, 1.2));
-  
-      async function makeThumbnail(url) {
-        if (thumbCache.has(url)) return thumbCache.get(url);
-  
-        // Load the GLB (reuse the same loader you already have in the app)
-        const gltf = await this.gltfLoader.loadAsync(url);
-        const model = gltf.scene;
-  
-        // Fit model in the tiny view
-        const box = new THREE.Box3().setFromObject(model);
-        const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const fitDist = maxDim * 2.5;
-  
-        model.position.sub(center);               // centre the model
-  
-        // Isometric view (45° from top-right)
-        const angle = Math.PI / 4;  // 45 degrees
-        thumbCamera.position.set(fitDist * Math.sin(angle), fitDist / 2, fitDist * Math.cos(angle));
-        thumbCamera.lookAt(0, 0, 0);
-  
-        thumbScene.add(model);
-        thumbRenderer.render(thumbScene, thumbCamera);
-        const dataURL = thumbRenderer.domElement.toDataURL('image/png');
-  
-        // clean up
-        thumbScene.remove(model);
-        model.traverse(child => {
-          if (child.isMesh) {
-            child.geometry?.dispose();
-            child.material?.dispose();
-          }
-        });
-  
-        thumbCache.set(url, dataURL);
-        return dataURL;
-      }
-  
-      // ----------------------------------------------------------------
-      // Build a card for every model
+      // Build a card for every model (now with pre-loaded thumbnails)
       // ----------------------------------------------------------------
       if (files && files.length > 0) {
-        files.forEach(async file => {
+        thumbs.forEach(({ file, thumbURL }) => {
           const card = document.createElement('div');
           card.style.cssText = `
             cursor:pointer;box-shadow:0 4px 8px rgba(0,0,0,0.1);
@@ -522,7 +477,7 @@ class App {
             background:#f5f5f5;position:relative;
           `;
           card.onmouseover = () => card.style.transform = 'scale(1.05)';
-          card.onmouseout  = () => card.style.transform = 'scale(1)';
+          card.onmouseout = () => card.style.transform = 'scale(1)';
   
           // checkbox in top-right corner
           const checkbox = document.createElement('input');
@@ -535,22 +490,11 @@ class App {
           checkbox.style.zIndex = '1';
           checkbox.style.margin = '0';
   
-          // placeholder while thumbnail loads
-          const placeholder = document.createElement('div');
-          placeholder.style.cssText = `
-            width:100%;height:${thumbSize}px;background:#e0e0e0;
-            display:flex;align-items:center;justify-content:center;
-            font-size:12px;color:#777;
-          `;
-          placeholder.textContent = 'Loading…';
-          card.appendChild(placeholder);
-  
-          // generate thumbnail (async)
-          const thumbURL = await makeThumbnail.call(this, file.url);
+          // Use pre-loaded thumbnail
           const img = new Image();
           img.src = thumbURL;
           img.style.cssText = 'width:100%;height:auto;display:block;';
-          card.replaceChild(img, placeholder);
+          card.appendChild(img);
   
           const name = document.createElement('p');
           name.textContent = file.name;
