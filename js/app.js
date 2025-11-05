@@ -403,6 +403,61 @@ class App {
       console.log('Data:', data);
       const files = data.models;
   
+      // ----------------------------------------------------------------
+      // Helper: tiny off-screen renderer for thumbnails
+      // ----------------------------------------------------------------
+      const thumbCache = new Map(); // url -> dataURL
+      const thumbSize = 150;
+      const thumbScene = new THREE.Scene();
+      const thumbCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+      const thumbRenderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+      thumbRenderer.setSize(thumbSize, thumbSize);
+      thumbRenderer.setClearColor(0x000000, 0); // transparent bg
+  
+      // simple white directional light (brighter)
+      const light = new THREE.DirectionalLight(0xffffff, 1.5);
+      light.position.set(5, 10, 7);
+      thumbScene.add(light);
+      thumbScene.add(new THREE.AmbientLight(0x404040, 1.2));
+  
+      async function makeThumbnail(url) {
+        if (thumbCache.has(url)) return thumbCache.get(url);
+  
+        // Load the GLB (reuse the same loader you already have in the app)
+        const gltf = await this.gltfLoader.loadAsync(url);
+        const model = gltf.scene;
+  
+        // Fit model in the tiny view
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fitDist = maxDim * 2.5;
+  
+        model.position.sub(center); // centre the model
+  
+        // Isometric view (45° from top-right)
+        const angle = Math.PI / 4; // 45 degrees
+        thumbCamera.position.set(fitDist * Math.sin(angle), fitDist / 2, fitDist * Math.cos(angle));
+        thumbCamera.lookAt(0, 0, 0);
+  
+        thumbScene.add(model);
+        thumbRenderer.render(thumbScene, thumbCamera);
+        const dataURL = thumbRenderer.domElement.toDataURL('image/png');
+  
+        // clean up
+        thumbScene.remove(model);
+        model.traverse(child => {
+          if (child.isMesh) {
+            child.geometry?.dispose();
+            child.material?.dispose();
+          }
+        });
+  
+        thumbCache.set(url, dataURL);
+        return dataURL;
+      }
+  
       // Generate all thumbnails in parallel before showing the modal
       const thumbPromises = files.map(async (file) => {
         const thumbURL = await makeThumbnail.call(this, file.url);
