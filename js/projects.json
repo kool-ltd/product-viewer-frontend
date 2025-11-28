@@ -12,9 +12,9 @@
     ],
     "product_B": [
       {
-        "url": "./models/project_A/DripEZ - Prep Tub - XXXL.glbb",
+        "url": "./models/project_A/DripEZ - Prep Tub - XXXL.glb",
         "name": "DripEZ - Prep Tu - XXXL"
-      },
+      }
     ]
-  },
+  }
 }
