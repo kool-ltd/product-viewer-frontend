@@ -905,7 +905,7 @@ class App {
     this.orbitControls.rotateSpeed = 0.5;
     this.orbitControls.enableDamping = true;
     this.orbitControls.dampingFactor = 0.05;
-    fetch('./projects.json')  // Adjust path if needed, e.g., './data/projects.json'
+    fetch('./js/projects.json')  // Adjust path if needed, e.g., './data/projects.json'
     .then(response => {
       if (!response.ok) {
         throw new Error('Failed to load projects.json');
