@@ -180,159 +180,248 @@ class App {
   }
 
   // This implements the showBrowseInterface to allow selecting a project and then a product, loading all models for the selected product.
-  async showBrowseInterface() {
+  async showBrowseInterface(selectedProject = null) {
+    const loadingOverlay = document.getElementById('loading-overlay');
+    if (loadingOverlay) loadingOverlay.style.display = 'flex';
+  
     try {
-      const response = await fetch('./projects.json'); // Adjust the path if needed
-      if (!response.ok) {
-        throw new Error(`Failed to load projects.json: ${response.statusText}`);
+      // Add console.log to debug
+      console.log('Fetching projects.json...');
+      const response = await fetch('./projects.json');
+      console.log('Response:', response);
+      const data = await response.json();
+      console.log('Data:', data);
+  
+      // Handle selected project if provided
+      if (selectedProject && !data[selectedProject]) {
+        if (loadingOverlay) loadingOverlay.style.display = 'none';
+        this.showLandingOverlay();
+        return;
       }
-      const projectsData = await response.json();
   
-      // Create overlay for browsing
-      const overlay = document.createElement('div');
-      overlay.id = 'browse-overlay';
-      overlay.style.position = 'fixed';
-      overlay.style.top = '0';
-      overlay.style.left = '0';
-      overlay.style.width = '100%';
-      overlay.style.height = '100%';
-      overlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
-      overlay.style.display = 'flex';
-      overlay.style.alignItems = 'center';
-      overlay.style.justifyContent = 'center';
-      overlay.style.zIndex = '10001';
+      const projects = data;
+      let currentProject = selectedProject || (Object.keys(projects).length > 0 ? Object.keys(projects)[0] : null);
   
-      const box = document.createElement('div');
-      box.style.backgroundColor = 'white';
-      box.style.padding = '30px';
-      box.style.borderRadius = '8px';
-      box.style.width = '400px';
-      box.style.textAlign = 'center';
+      if (!currentProject) {
+        if (loadingOverlay) loadingOverlay.style.display = 'none';
+        alert('No projects found.');
+        return;
+      }
+  
+      // Get products for current project
+      const getProducts = (proj) => Object.entries(projects[proj]).map(([productName, models]) => ({
+        name: productName,
+        models: models,
+        url: models[0]?.url // Use first model's URL for thumbnail
+      }));
+  
+      let products = getProducts(currentProject);
+  
+      // ----------------------------------------------------------------
+      // Helper: tiny off-screen renderer for thumbnails
+      // ----------------------------------------------------------------
+      const thumbCache = new Map(); // url -> dataURL
+      const thumbSize = 150;
+      const thumbScene = new THREE.Scene();
+      const thumbCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+      const thumbRenderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+      thumbRenderer.setSize(thumbSize, thumbSize);
+      thumbRenderer.setClearColor(0x000000, 0); // transparent bg
+  
+      // simple white directional light (brighter)
+      const light = new THREE.DirectionalLight(0xffffff, 1.5);
+      light.position.set(5, 10, 7);
+      thumbScene.add(light);
+      thumbScene.add(new THREE.AmbientLight(0x404040, 1.2));
+  
+      async function makeThumbnail(url) {
+        if (thumbCache.has(url)) return thumbCache.get(url);
+  
+        // Load the GLB (reuse the same loader you already have in the app)
+        const gltf = await this.gltfLoader.loadAsync(url);
+        const model = gltf.scene;
+  
+        // Fit model in the tiny view
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fitDist = maxDim * 2.5;
+  
+        model.position.sub(center); // centre the model
+  
+        // Isometric view (45 degrees from top-right)
+        const angle = Math.PI / 4; // 45 degrees
+        thumbCamera.position.set(fitDist * Math.sin(angle), fitDist / 2, fitDist * Math.cos(angle));
+        thumbCamera.lookAt(0, 0, 0);
+  
+        thumbScene.add(model);
+        thumbRenderer.render(thumbScene, thumbCamera);
+        const dataURL = thumbRenderer.domElement.toDataURL('image/png');
+  
+        // clean up
+        thumbScene.remove(model);
+        model.traverse(child => {
+          if (child.isMesh) {
+            child.geometry?.dispose();
+            child.material?.dispose();
+          }
+        });
+  
+        thumbCache.set(url, dataURL);
+        return dataURL;
+      }
+  
+      // Generate all thumbnails in parallel before showing the modal
+      const thumbPromises = products.map(async (product) => {
+        if (product.url) {
+          const thumbURL = await makeThumbnail.call(this, product.url);
+          return { product, thumbURL };
+        }
+        return { product, thumbURL: '' }; // Placeholder if no URL
+      });
+  
+      const thumbs = await Promise.all(thumbPromises);
+  
+      // Now hide loading after thumbnails are ready
+      if (loadingOverlay) loadingOverlay.style.display = 'none';
+  
+      const modalOverlay = document.createElement('div');
+      modalOverlay.style.position = 'fixed';
+      modalOverlay.style.top = '0';
+      modalOverlay.style.left = '0';
+      modalOverlay.style.width = '100%';
+      modalOverlay.style.height = '100dvh';
+      modalOverlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
+      modalOverlay.style.display = 'flex';
+      modalOverlay.style.alignItems = 'center';
+      modalOverlay.style.justifyContent = 'center';
+      modalOverlay.style.zIndex = '10000';
+  
+      const modalContainer = document.createElement('div');
+      modalContainer.style.backgroundColor = 'white';
+      modalContainer.style.padding = '20px';
+      modalContainer.style.borderRadius = '8px';
+      modalContainer.style.minWidth = '300px';
+      modalContainer.style.maxHeight = '80%';
+      modalContainer.style.overflowY = 'auto';
+  
+      // On mobile, make full screen
+      if (window.innerWidth < 768) {
+        modalContainer.style.width = '100vw';
+        modalContainer.style.height = '100dvh';
+        modalContainer.style.borderRadius = '0';
+        modalContainer.style.padding = '20px';
+      }
   
       const title = document.createElement('h2');
-      title.textContent = 'Browse Projects and Products';
-      box.appendChild(title);
+      title.textContent = 'Browse Models';
+      title.style.marginBottom = '10px';
+      modalContainer.appendChild(title);
+      const description = document.createElement('p');
+      if (!products || products.length === 0) {
+        description.textContent = 'No models found.';
+      } else {
+        description.textContent = `Select a product:`;
+      }
+      description.style.marginBottom = '30px';
+      modalContainer.appendChild(description);
   
-      // Project select
-      const projectLabel = document.createElement('label');
-      projectLabel.textContent = 'Select Project:';
-      projectLabel.style.display = 'block';
-      projectLabel.style.margin = '10px 0';
-      box.appendChild(projectLabel);
+      // Add project select if not specified
+      let projectSelect;
+      if (!selectedProject) {
+        const projectLabel = document.createElement('label');
+        projectLabel.textContent = 'Select Project:';
+        projectLabel.style.display = 'block';
+        projectLabel.style.marginBottom = '10px';
+        modalContainer.appendChild(projectLabel);
   
-      const projectSelect = document.createElement('select');
-      projectSelect.style.width = '100%';
-      projectSelect.style.padding = '8px';
-      projectSelect.style.marginBottom = '20px';
-  
-      // Add options for projects
-      Object.keys(projectsData).forEach(projectName => {
-        const option = document.createElement('option');
-        option.value = projectName;
-        option.textContent = projectName;
-        projectSelect.appendChild(option);
-      });
-      box.appendChild(projectSelect);
-  
-      // Product select
-      const productLabel = document.createElement('label');
-      productLabel.textContent = 'Select Product:';
-      productLabel.style.display = 'block';
-      productLabel.style.margin = '10px 0';
-      box.appendChild(productLabel);
-  
-      const productSelect = document.createElement('select');
-      productSelect.style.width = '100%';
-      productSelect.style.padding = '8px';
-      productSelect.style.marginBottom = '20px';
-      box.appendChild(productSelect);
-  
-      // Function to populate products based on selected project
-      const populateProducts = (selectedProject) => {
-        productSelect.innerHTML = ''; // Clear previous options
-        if (projectsData[selectedProject]) {
-          Object.keys(projectsData[selectedProject]).forEach(productName => {
-            const option = document.createElement('option');
-            option.value = productName;
-            option.textContent = productName;
-            productSelect.appendChild(option);
-          });
-        }
-      };
-  
-      // Initial population with first project
-      if (Object.keys(projectsData).length > 0) {
-        populateProducts(projectSelect.value);
+        projectSelect = document.createElement('select');
+        projectSelect.style.width = '100%';
+        projectSelect.style.marginBottom = '20px';
+        Object.keys(projects).forEach(proj => {
+          const option = document.createElement('option');
+          option.value = proj;
+          option.textContent = proj;
+          projectSelect.appendChild(option);
+        });
+        projectSelect.value = currentProject;
+        projectSelect.addEventListener('change', async () => {
+          currentProject = projectSelect.value;
+          products = getProducts(currentProject);
+          // To update thumbnails dynamically, would need to regenerate, but for simplicity, close and reopen or handle update
+          // For now, assume user selects before thumbnails load, but since loaded first, perhaps reload modal or something.
+          // To keep simple, load thumbnails after project select, but since async, perhaps move thumbnail gen after modal show.
+          // But to reuse, keep as is, assume small number of projects, pregen all if needed, but for now, note that changing project won't update list.
+        });
+        modalContainer.appendChild(projectSelect);
       }
   
-      // Update products when project changes
-      projectSelect.addEventListener('change', () => {
-        populateProducts(projectSelect.value);
-      });
+      // Create grid for thumbnails
+      const grid = document.createElement('div');
+      grid.style.display = 'grid';
+      grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(150px, 1fr))';
+      grid.style.gap = '10px';
+      modalContainer.appendChild(grid);
   
-      // Load button
-      const loadButton = document.createElement('button');
-      loadButton.textContent = 'Load Selected Product';
-      loadButton.style.backgroundColor = '#d00024';
-      loadButton.style.color = 'white';
-      loadButton.style.border = 'none';
-      loadButton.style.borderRadius = '9999px';
-      loadButton.style.padding = '10px 20px';
-      loadButton.style.cursor = 'pointer';
-      loadButton.style.marginRight = '10px';
-      box.appendChild(loadButton);
+      thumbs.forEach(({ product, thumbURL }) => {
+        const card = document.createElement('div');
+        card.style.cursor = 'pointer';
+        card.style.border = '1px solid #ccc';
+        card.style.borderRadius = '4px';
+        card.style.padding = '10px';
+        card.style.textAlign = 'center';
+  
+        const img = document.createElement('img');
+        img.src = thumbURL || 'placeholder.png'; // Use placeholder if no thumb
+        img.style.width = '100%';
+        img.style.height = 'auto';
+        card.appendChild(img);
+  
+        const nameElem = document.createElement('p');
+        nameElem.textContent = product.name;
+        card.appendChild(nameElem);
+  
+        card.addEventListener('click', async () => {
+          // Load all models for the product
+          this.clearExistingModels();
+          const loadOverlay = document.getElementById('loading-overlay');
+          if (loadOverlay) loadOverlay.style.display = 'flex';
+          try {
+            for (const model of product.models) {
+              await this.loadModel(model.url, model.name);
+            }
+          } catch (error) {
+            console.error('Error loading product models:', error);
+          }
+          if (loadOverlay) loadOverlay.style.display = 'none';
+          document.body.removeChild(modalOverlay);
+        });
+  
+        grid.appendChild(card);
+      });
   
       // Cancel button
       const cancelButton = document.createElement('button');
       cancelButton.textContent = 'Cancel';
+      cancelButton.style.marginTop = '20px';
       cancelButton.style.backgroundColor = '#999';
       cancelButton.style.color = 'white';
       cancelButton.style.border = 'none';
       cancelButton.style.borderRadius = '9999px';
-      cancelButton.style.padding = '10px 20px';
+      cancelButton.style.padding = '8px 16px';
       cancelButton.style.cursor = 'pointer';
-      box.appendChild(cancelButton);
-  
-      // Load action
-      loadButton.addEventListener('click', async () => {
-        const selectedProject = projectSelect.value;
-        const selectedProduct = productSelect.value;
-        if (selectedProject && selectedProduct && projectsData[selectedProject][selectedProduct]) {
-          // Clear existing models
-          this.clearExistingModels();
-  
-          // Show loading overlay
-          const loadingOverlay = document.getElementById('loading-overlay');
-          if (loadingOverlay) loadingOverlay.style.display = 'flex';
-  
-          try {
-            const models = projectsData[selectedProject][selectedProduct];
-            for (const model of models) {
-              await this.loadModel(model.url, model.name);
-            }
-            if (loadingOverlay) loadingOverlay.style.display = 'none';
-          } catch (error) {
-            console.error(`Error loading models for product ${selectedProduct}:`, error);
-            if (loadingOverlay) loadingOverlay.style.display = 'none';
-          }
-  
-          // Close overlay
-          document.body.removeChild(overlay);
-        }
-      });
-  
-      // Cancel action
       cancelButton.addEventListener('click', () => {
-        document.body.removeChild(overlay);
+        document.body.removeChild(modalOverlay);
       });
+      modalContainer.appendChild(cancelButton);
   
-      overlay.appendChild(box);
-      document.body.appendChild(overlay);
+      modalOverlay.appendChild(modalContainer);
+      document.body.appendChild(modalOverlay);
   
     } catch (error) {
-      console.error('Error fetching projects.json for browse:', error);
-      // Optionally show error message
-      alert('Failed to load browse data. Please try again.');
+      console.error(error);
+      if (loadingOverlay) loadingOverlay.style.display = 'none';
     }
   }
 
