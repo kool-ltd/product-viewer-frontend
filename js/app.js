@@ -179,6 +179,163 @@ class App {
     }
   }
 
+  // This implements the showBrowseInterface to allow selecting a project and then a product, loading all models for the selected product.
+  async showBrowseInterface() {
+    try {
+      const response = await fetch('./projects.json'); // Adjust the path if needed
+      if (!response.ok) {
+        throw new Error(`Failed to load projects.json: ${response.statusText}`);
+      }
+      const projectsData = await response.json();
+  
+      // Create overlay for browsing
+      const overlay = document.createElement('div');
+      overlay.id = 'browse-overlay';
+      overlay.style.position = 'fixed';
+      overlay.style.top = '0';
+      overlay.style.left = '0';
+      overlay.style.width = '100%';
+      overlay.style.height = '100%';
+      overlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
+      overlay.style.display = 'flex';
+      overlay.style.alignItems = 'center';
+      overlay.style.justifyContent = 'center';
+      overlay.style.zIndex = '10001';
+  
+      const box = document.createElement('div');
+      box.style.backgroundColor = 'white';
+      box.style.padding = '30px';
+      box.style.borderRadius = '8px';
+      box.style.width = '400px';
+      box.style.textAlign = 'center';
+  
+      const title = document.createElement('h2');
+      title.textContent = 'Browse Projects and Products';
+      box.appendChild(title);
+  
+      // Project select
+      const projectLabel = document.createElement('label');
+      projectLabel.textContent = 'Select Project:';
+      projectLabel.style.display = 'block';
+      projectLabel.style.margin = '10px 0';
+      box.appendChild(projectLabel);
+  
+      const projectSelect = document.createElement('select');
+      projectSelect.style.width = '100%';
+      projectSelect.style.padding = '8px';
+      projectSelect.style.marginBottom = '20px';
+  
+      // Add options for projects
+      Object.keys(projectsData).forEach(projectName => {
+        const option = document.createElement('option');
+        option.value = projectName;
+        option.textContent = projectName;
+        projectSelect.appendChild(option);
+      });
+      box.appendChild(projectSelect);
+  
+      // Product select
+      const productLabel = document.createElement('label');
+      productLabel.textContent = 'Select Product:';
+      productLabel.style.display = 'block';
+      productLabel.style.margin = '10px 0';
+      box.appendChild(productLabel);
+  
+      const productSelect = document.createElement('select');
+      productSelect.style.width = '100%';
+      productSelect.style.padding = '8px';
+      productSelect.style.marginBottom = '20px';
+      box.appendChild(productSelect);
+  
+      // Function to populate products based on selected project
+      const populateProducts = (selectedProject) => {
+        productSelect.innerHTML = ''; // Clear previous options
+        if (projectsData[selectedProject]) {
+          Object.keys(projectsData[selectedProject]).forEach(productName => {
+            const option = document.createElement('option');
+            option.value = productName;
+            option.textContent = productName;
+            productSelect.appendChild(option);
+          });
+        }
+      };
+  
+      // Initial population with first project
+      if (Object.keys(projectsData).length > 0) {
+        populateProducts(projectSelect.value);
+      }
+  
+      // Update products when project changes
+      projectSelect.addEventListener('change', () => {
+        populateProducts(projectSelect.value);
+      });
+  
+      // Load button
+      const loadButton = document.createElement('button');
+      loadButton.textContent = 'Load Selected Product';
+      loadButton.style.backgroundColor = '#d00024';
+      loadButton.style.color = 'white';
+      loadButton.style.border = 'none';
+      loadButton.style.borderRadius = '9999px';
+      loadButton.style.padding = '10px 20px';
+      loadButton.style.cursor = 'pointer';
+      loadButton.style.marginRight = '10px';
+      box.appendChild(loadButton);
+  
+      // Cancel button
+      const cancelButton = document.createElement('button');
+      cancelButton.textContent = 'Cancel';
+      cancelButton.style.backgroundColor = '#999';
+      cancelButton.style.color = 'white';
+      cancelButton.style.border = 'none';
+      cancelButton.style.borderRadius = '9999px';
+      cancelButton.style.padding = '10px 20px';
+      cancelButton.style.cursor = 'pointer';
+      box.appendChild(cancelButton);
+  
+      // Load action
+      loadButton.addEventListener('click', async () => {
+        const selectedProject = projectSelect.value;
+        const selectedProduct = productSelect.value;
+        if (selectedProject && selectedProduct && projectsData[selectedProject][selectedProduct]) {
+          // Clear existing models
+          this.clearExistingModels();
+  
+          // Show loading overlay
+          const loadingOverlay = document.getElementById('loading-overlay');
+          if (loadingOverlay) loadingOverlay.style.display = 'flex';
+  
+          try {
+            const models = projectsData[selectedProject][selectedProduct];
+            for (const model of models) {
+              await this.loadModel(model.url, model.name);
+            }
+            if (loadingOverlay) loadingOverlay.style.display = 'none';
+          } catch (error) {
+            console.error(`Error loading models for product ${selectedProduct}:`, error);
+            if (loadingOverlay) loadingOverlay.style.display = 'none';
+          }
+  
+          // Close overlay
+          document.body.removeChild(overlay);
+        }
+      });
+  
+      // Cancel action
+      cancelButton.addEventListener('click', () => {
+        document.body.removeChild(overlay);
+      });
+  
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+  
+    } catch (error) {
+      console.error('Error fetching projects.json for browse:', error);
+      // Optionally show error message
+      alert('Failed to load browse data. Please try again.');
+    }
+  }
+
   // Ensure FontAwesome is loaded
   ensureFontAwesomeLoaded() {
     if (!document.querySelector('link[href*="font-awesome"]')) {
