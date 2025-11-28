@@ -6,7 +6,7 @@ import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFa
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { InteractionManager } from './InteractionManager.js';
 import { setupUIControls } from './uiControls.js';
-import { showConfirmationModal } from './modalManager.js';
+import { showModal, hideModal, showConfirmationModal } from './modalManager.js';
 
 class App {
   constructor() {
