@@ -120,9 +120,58 @@ class App {
       if (this.rotateLeftBtn) this.rotateLeftBtn.style.display = 'none';
       if (this.rotateRightBtn) this.rotateRightBtn.style.display = 'none';
     });
-  
-    // Instead of directly loading the default product, show the landing overlay.
-    this.showLandingOverlay();
+    
+    
+    // This checks the URL query parameter and loads project-specific models if present, otherwise shows the landing overlay.
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const project = urlParams.get('project');
+    
+    if (project) {
+      // Fetch the projects.json file
+      try {
+        const response = await fetch('./projects.json'); // Adjust the path if the file is in a different directory
+        if (!response.ok) {
+          throw new Error(`Failed to load projects.json: ${response.statusText}`);
+        }
+        const projectsData = await response.json();
+    
+        if (projectsData[project]) {
+          // Load all models for the specified project (flattening across all sub-products)
+          this.clearExistingModels();
+          const projectModels = projectsData[project];
+          let allModels = [];
+          for (const productKey in projectModels) {
+            allModels = allModels.concat(projectModels[productKey]);
+          }
+    
+          // Show loading overlay
+          const loadingOverlay = document.getElementById('loading-overlay');
+          if (loadingOverlay) loadingOverlay.style.display = 'flex';
+    
+          try {
+            for (const model of allModels) {
+              await this.loadModel(model.url, model.name);
+            }
+            if (loadingOverlay) loadingOverlay.style.display = 'none';
+          } catch (error) {
+            console.error(`Error loading models for project ${project}:`, error);
+            if (loadingOverlay) loadingOverlay.style.display = 'none';
+            // Fallback to landing if loading fails
+            this.showLandingOverlay();
+          }
+        } else {
+          // Project not found in JSON, show landing
+          this.showLandingOverlay();
+        }
+      } catch (error) {
+        console.error('Error fetching projects.json:', error);
+        this.showLandingOverlay();
+      }
+    } else {
+      // Default behavior: show the landing overlay
+      this.showLandingOverlay();
+    }
 
     this.animate();
   }
