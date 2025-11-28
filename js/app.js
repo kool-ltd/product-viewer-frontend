@@ -139,257 +139,43 @@ class App {
 
   async loadProject(project) {
     try {
-      // Show browse interface filtered to the project
-      await this.showBrowseInterface(project);
-    } catch (error) {
-      console.error('Error in loadProject:', error);
-      this.showLandingOverlay();
-    }
-  }
-
-  // This implements the showBrowseInterface to allow selecting a project and then a product, loading all models for the selected product.
-  async showBrowseInterface(selectedProject = null) {
-    const loadingOverlay = document.getElementById('loading-overlay');
-    if (loadingOverlay) loadingOverlay.style.display = 'flex';
-  
-    try {
-      // Add console.log to debug
-      console.log('Fetching projects.json...');
-      const response = await fetch('./projects.json');
-      console.log('Response:', response);
-      const data = await response.json();
-      console.log('Data:', data);
-  
-      // Handle selected project if provided
-      if (selectedProject && !data[selectedProject]) {
-        if (loadingOverlay) loadingOverlay.style.display = 'none';
-        this.showLandingOverlay();
-        return;
+      const response = await fetch('./js/projects.json'); // Adjust the path if the file is in a different directory
+      if (!response.ok) {
+        throw new Error(`Failed to load projects.json: ${response.statusText}`);
       }
+      const projectsData = await response.json();
   
-      const projects = data;
-      let currentProject = selectedProject || (Object.keys(projects).length > 0 ? Object.keys(projects)[0] : null);
-  
-      if (!currentProject) {
-        if (loadingOverlay) loadingOverlay.style.display = 'none';
-        alert('No projects found.');
-        return;
-      }
-  
-      // Get products for current project
-      const getProducts = (proj) => Object.entries(projects[proj]).map(([productName, models]) => ({
-        name: productName,
-        models: models,
-        url: models[0]?.url // Use first model's URL for thumbnail
-      }));
-  
-      let products = getProducts(currentProject);
-  
-      // ----------------------------------------------------------------
-      // Helper: tiny off-screen renderer for thumbnails
-      // ----------------------------------------------------------------
-      const thumbCache = new Map(); // url -> dataURL
-      const thumbSize = 150;
-      const thumbScene = new THREE.Scene();
-      const thumbCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
-      const thumbRenderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
-      thumbRenderer.setSize(thumbSize, thumbSize);
-      thumbRenderer.setClearColor(0x000000, 0); // transparent bg
-  
-      // simple white directional light (brighter)
-      const light = new THREE.DirectionalLight(0xffffff, 1.5);
-      light.position.set(5, 10, 7);
-      thumbScene.add(light);
-      thumbScene.add(new THREE.AmbientLight(0x404040, 1.2));
-  
-      async function makeThumbnail(url) {
-        if (thumbCache.has(url)) return thumbCache.get(url);
-  
-        // Load the GLB (reuse the same loader you already have in the app)
-        const gltf = await this.gltfLoader.loadAsync(url);
-        const model = gltf.scene;
-  
-        // Fit model in the tiny view
-        const box = new THREE.Box3().setFromObject(model);
-        const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const fitDist = maxDim * 2.5;
-  
-        model.position.sub(center); // centre the model
-  
-        // Isometric view (45 degrees from top-right)
-        const angle = Math.PI / 4; // 45 degrees
-        thumbCamera.position.set(fitDist * Math.sin(angle), fitDist / 2, fitDist * Math.cos(angle));
-        thumbCamera.lookAt(0, 0, 0);
-  
-        thumbScene.add(model);
-        thumbRenderer.render(thumbScene, thumbCamera);
-        const dataURL = thumbRenderer.domElement.toDataURL('image/png');
-  
-        // clean up
-        thumbScene.remove(model);
-        model.traverse(child => {
-          if (child.isMesh) {
-            child.geometry?.dispose();
-            child.material?.dispose();
-          }
-        });
-  
-        thumbCache.set(url, dataURL);
-        return dataURL;
-      }
-  
-      // Generate all thumbnails in parallel before showing the modal
-      const thumbPromises = products.map(async (product) => {
-        if (product.url) {
-          const thumbURL = await makeThumbnail.call(this, product.url);
-          return { product, thumbURL };
+      if (projectsData[project]) {
+        // Load all models for the specified project (flattening across all sub-products)
+        this.clearExistingModels();
+        const projectModels = projectsData[project];
+        let allModels = [];
+        for (const productKey in projectModels) {
+          allModels = allModels.concat(projectModels[productKey]);
         }
-        return { product, thumbURL: '' }; // Placeholder if no URL
-      });
   
-      const thumbs = await Promise.all(thumbPromises);
+        // Show loading overlay
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) loadingOverlay.style.display = 'flex';
   
-      // Now hide loading after thumbnails are ready
-      if (loadingOverlay) loadingOverlay.style.display = 'none';
-  
-      const modalOverlay = document.createElement('div');
-      modalOverlay.style.position = 'fixed';
-      modalOverlay.style.top = '0';
-      modalOverlay.style.left = '0';
-      modalOverlay.style.width = '100%';
-      modalOverlay.style.height = '100dvh';
-      modalOverlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
-      modalOverlay.style.display = 'flex';
-      modalOverlay.style.alignItems = 'center';
-      modalOverlay.style.justifyContent = 'center';
-      modalOverlay.style.zIndex = '10000';
-  
-      const modalContainer = document.createElement('div');
-      modalContainer.style.backgroundColor = 'white';
-      modalContainer.style.padding = '20px';
-      modalContainer.style.borderRadius = '8px';
-      modalContainer.style.minWidth = '300px';
-      modalContainer.style.maxHeight = '80%';
-      modalContainer.style.overflowY = 'auto';
-  
-      // On mobile, make full screen
-      if (window.innerWidth < 768) {
-        modalContainer.style.width = '100vw';
-        modalContainer.style.height = '100dvh';
-        modalContainer.style.borderRadius = '0';
-        modalContainer.style.padding = '20px';
-      }
-  
-      const title = document.createElement('h2');
-      title.textContent = 'Browse Models';
-      title.style.marginBottom = '10px';
-      modalContainer.appendChild(title);
-      const description = document.createElement('p');
-      if (!products || products.length === 0) {
-        description.textContent = 'No models found.';
-      } else {
-        description.textContent = `Select a product:`;
-      }
-      description.style.marginBottom = '30px';
-      modalContainer.appendChild(description);
-  
-      // Add project select if not specified
-      let projectSelect;
-      if (!selectedProject) {
-        const projectLabel = document.createElement('label');
-        projectLabel.textContent = 'Select Project:';
-        projectLabel.style.display = 'block';
-        projectLabel.style.marginBottom = '10px';
-        modalContainer.appendChild(projectLabel);
-  
-        projectSelect = document.createElement('select');
-        projectSelect.style.width = '100%';
-        projectSelect.style.marginBottom = '20px';
-        Object.keys(projects).forEach(proj => {
-          const option = document.createElement('option');
-          option.value = proj;
-          option.textContent = proj;
-          projectSelect.appendChild(option);
-        });
-        projectSelect.value = currentProject;
-        projectSelect.addEventListener('change', async () => {
-          currentProject = projectSelect.value;
-          products = getProducts(currentProject);
-          // To update thumbnails dynamically, would need to regenerate, but for simplicity, close and reopen or handle update
-          // For now, assume user selects before thumbnails load, but since loaded first, perhaps reload modal or something.
-          // To keep simple, load thumbnails after project select, but since async, perhaps move thumbnail gen after modal show.
-          // But to reuse, keep as is, assume small number of projects, pregen all if needed, but for now, note that changing project won't update list.
-        });
-        modalContainer.appendChild(projectSelect);
-      }
-  
-      // Create grid for thumbnails
-      const grid = document.createElement('div');
-      grid.style.display = 'grid';
-      grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(150px, 1fr))';
-      grid.style.gap = '10px';
-      modalContainer.appendChild(grid);
-  
-      thumbs.forEach(({ product, thumbURL }) => {
-        const card = document.createElement('div');
-        card.style.cursor = 'pointer';
-        card.style.border = '1px solid #ccc';
-        card.style.borderRadius = '4px';
-        card.style.padding = '10px';
-        card.style.textAlign = 'center';
-  
-        const img = document.createElement('img');
-        img.src = thumbURL || 'placeholder.png'; // Use placeholder if no thumb
-        img.style.width = '100%';
-        img.style.height = 'auto';
-        card.appendChild(img);
-  
-        const nameElem = document.createElement('p');
-        nameElem.textContent = product.name;
-        card.appendChild(nameElem);
-  
-        card.addEventListener('click', async () => {
-          // Load all models for the product
-          this.clearExistingModels();
-          const loadOverlay = document.getElementById('loading-overlay');
-          if (loadOverlay) loadOverlay.style.display = 'flex';
-          try {
-            for (const model of product.models) {
-              await this.loadModel(model.url, model.name);
-            }
-          } catch (error) {
-            console.error('Error loading product models:', error);
+        try {
+          for (const model of allModels) {
+            await this.loadModel(model.url, model.name);
           }
-          if (loadOverlay) loadOverlay.style.display = 'none';
-          document.body.removeChild(modalOverlay);
-        });
-  
-        grid.appendChild(card);
-      });
-  
-      // Cancel button
-      const cancelButton = document.createElement('button');
-      cancelButton.textContent = 'Cancel';
-      cancelButton.style.marginTop = '20px';
-      cancelButton.style.backgroundColor = '#999';
-      cancelButton.style.color = 'white';
-      cancelButton.style.border = 'none';
-      cancelButton.style.borderRadius = '9999px';
-      cancelButton.style.padding = '8px 16px';
-      cancelButton.style.cursor = 'pointer';
-      cancelButton.addEventListener('click', () => {
-        document.body.removeChild(modalOverlay);
-      });
-      modalContainer.appendChild(cancelButton);
-  
-      modalOverlay.appendChild(modalContainer);
-      document.body.appendChild(modalOverlay);
-  
+          if (loadingOverlay) loadingOverlay.style.display = 'none';
+        } catch (error) {
+          console.error(`Error loading models for project ${project}:`, error);
+          if (loadingOverlay) loadingOverlay.style.display = 'none';
+          // Fallback to landing if loading fails
+          this.showLandingOverlay();
+        }
+      } else {
+        // Project not found in JSON, show landing
+        this.showLandingOverlay();
+      }
     } catch (error) {
-      console.error(error);
-      if (loadingOverlay) loadingOverlay.style.display = 'none';
+      console.error('Error fetching projects.json:', error);
+      this.showLandingOverlay();
     }
   }
 
@@ -656,32 +442,84 @@ class App {
   // -----------------------------------------------------------------------------
   // Browser-Based File Browser 
   // -----------------------------------------------------------------------------
-  async showBrowseInterface(selectedProject = null) {
+  async showBrowseInterface() {
     const loadingOverlay = document.getElementById('loading-overlay');
     if (loadingOverlay) loadingOverlay.style.display = 'flex';
   
     try {
-      console.log('Fetching projects.json...');
-      const response = await fetch('./js/projects.json');
+      // Add console.log to debug
+      console.log('Fetching files.json...');
+      const response = await fetch('./assets/files.json');
       console.log('Response:', response);
       const data = await response.json();
       console.log('Data:', data);
+      const files = data.models;
   
+      // ----------------------------------------------------------------
+      // Helper: tiny off-screen renderer for thumbnails
+      // ----------------------------------------------------------------
+      const thumbCache = new Map(); // url -> dataURL
+      const thumbSize = 150;
+      const thumbScene = new THREE.Scene();
+      const thumbCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+      const thumbRenderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+      thumbRenderer.setSize(thumbSize, thumbSize);
+      thumbRenderer.setClearColor(0x000000, 0); // transparent bg
+  
+      // simple white directional light (brighter)
+      const light = new THREE.DirectionalLight(0xffffff, 1.5);
+      light.position.set(5, 10, 7);
+      thumbScene.add(light);
+      thumbScene.add(new THREE.AmbientLight(0x404040, 1.2));
+  
+      async function makeThumbnail(url) {
+        if (thumbCache.has(url)) return thumbCache.get(url);
+  
+        // Load the GLB (reuse the same loader you already have in the app)
+        const gltf = await this.gltfLoader.loadAsync(url);
+        const model = gltf.scene;
+  
+        // Fit model in the tiny view
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fitDist = maxDim * 2.5;
+  
+        model.position.sub(center); // centre the model
+  
+        // Isometric view (45° from top-right)
+        const angle = Math.PI / 4; // 45 degrees
+        thumbCamera.position.set(fitDist * Math.sin(angle), fitDist / 2, fitDist * Math.cos(angle));
+        thumbCamera.lookAt(0, 0, 0);
+  
+        thumbScene.add(model);
+        thumbRenderer.render(thumbScene, thumbCamera);
+        const dataURL = thumbRenderer.domElement.toDataURL('image/png');
+  
+        // clean up
+        thumbScene.remove(model);
+        model.traverse(child => {
+          if (child.isMesh) {
+            child.geometry?.dispose();
+            child.material?.dispose();
+          }
+        });
+  
+        thumbCache.set(url, dataURL);
+        return dataURL;
+      }
+  
+      // Generate all thumbnails in parallel before showing the modal
+      const thumbPromises = files.map(async (file) => {
+        const thumbURL = await makeThumbnail.call(this, file.url);
+        return { file, thumbURL };
+      });
+  
+      const thumbs = await Promise.all(thumbPromises);
+  
+      // Now hide loading after thumbnails are ready
       if (loadingOverlay) loadingOverlay.style.display = 'none';
-  
-      // Handle selected project if provided
-      if (selectedProject && !data[selectedProject]) {
-        this.showLandingOverlay();
-        return;
-      }
-  
-      const projects = data;
-      let currentProject = selectedProject || (Object.keys(projects).length > 0 ? Object.keys(projects)[0] : null);
-  
-      if (!currentProject) {
-        alert('No projects found.');
-        return;
-      }
   
       const modalOverlay = document.createElement('div');
       modalOverlay.style.position = 'fixed';
@@ -715,191 +553,143 @@ class App {
       title.textContent = 'Browse Models';
       title.style.marginBottom = '10px';
       modalContainer.appendChild(title);
-  
       const description = document.createElement('p');
-      description.textContent = `Select a product:`;
+      if (!files || files.length === 0) {
+        description.textContent = 'No models found.';
+      } else {
+        description.textContent = `Select models (multiple selections allowed): `;
+      }
       description.style.marginBottom = '30px';
       modalContainer.appendChild(description);
   
-      // Add project select if not specified
-      let projectSelect;
-      if (!selectedProject) {
-        const projectLabel = document.createElement('label');
-        projectLabel.textContent = 'Select Project:';
-        projectLabel.style.display = 'block';
-        projectLabel.style.marginBottom = '10px';
-        modalContainer.appendChild(projectLabel);
-  
-        projectSelect = document.createElement('select');
-        projectSelect.style.width = '100%';
-        projectSelect.style.marginBottom = '20px';
-        Object.keys(projects).forEach(proj => {
-          const option = document.createElement('option');
-          option.value = proj;
-          option.textContent = proj;
-          projectSelect.appendChild(option);
-        });
-        projectSelect.value = currentProject;
-        modalContainer.appendChild(projectSelect);
-      }
-  
-      // Create grid for thumbnails
+      // ----------------------------------------------------------------
+      // Grid container – 3 columns (auto-fit fallback)
+      // ----------------------------------------------------------------
       const grid = document.createElement('div');
-      grid.style.display = 'grid';
-      grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(150px, 1fr))';
-      grid.style.gap = '10px';
-      modalContainer.appendChild(grid);
-  
-      // Cancel button
-      const cancelButton = document.createElement('button');
-      cancelButton.textContent = 'Cancel';
-      cancelButton.style.marginTop = '20px';
-      cancelButton.style.backgroundColor = '#999';
-      cancelButton.style.color = 'white';
-      cancelButton.style.border = 'none';
-      cancelButton.style.borderRadius = '9999px';
-      cancelButton.style.padding = '8px 16px';
-      cancelButton.style.cursor = 'pointer';
-      cancelButton.addEventListener('click', () => {
-        document.body.removeChild(modalOverlay);
-      });
-      modalContainer.appendChild(cancelButton);
-  
-      modalOverlay.appendChild(modalContainer);
-      document.body.appendChild(modalOverlay);
+      grid.style.cssText = `
+        display:grid;
+        grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+        gap:20px;margin-bottom:30px;
+      `;
   
       // ----------------------------------------------------------------
-      // Helper: tiny off-screen renderer for thumbnails
+      // Build a card for every model (now with pre-loaded thumbnails)
       // ----------------------------------------------------------------
-      const thumbCache = new Map(); // url -> dataURL
-      const thumbSize = 150;
-      const thumbScene = new THREE.Scene();
-      const thumbCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
-      const thumbRenderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
-      thumbRenderer.setSize(thumbSize, thumbSize);
-      thumbRenderer.setClearColor(0x000000, 0); // transparent bg
-  
-      // simple white directional light (brighter)
-      const light = new THREE.DirectionalLight(0xffffff, 1.5);
-      light.position.set(5, 10, 7);
-      thumbScene.add(light);
-      thumbScene.add(new THREE.AmbientLight(0x404040, 1.2));
-  
-      async function makeThumbnail(url) {
-        if (thumbCache.has(url)) return thumbCache.get(url);
-  
-        // Load the GLB
-        const gltf = await this.gltfLoader.loadAsync(url);
-        const model = gltf.scene;
-  
-        // Fit model
-        const box = new THREE.Box3().setFromObject(model);
-        const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const fitDist = maxDim * 2.5;
-  
-        model.position.sub(center);
-  
-        const angle = Math.PI / 4;
-        thumbCamera.position.set(fitDist * Math.sin(angle), fitDist / 2, fitDist * Math.cos(angle));
-        thumbCamera.lookAt(0, 0, 0);
-  
-        thumbScene.add(model);
-        thumbRenderer.render(thumbScene, thumbCamera);
-        const dataURL = thumbRenderer.domElement.toDataURL('image/png');
-  
-        thumbScene.remove(model);
-        model.traverse(child => {
-          if (child.isMesh) {
-            child.geometry?.dispose();
-            child.material?.dispose();
-          }
-        });
-  
-        thumbCache.set(url, dataURL);
-        return dataURL;
-      }
-  
-      // Function to update grid for current project
-      async function updateGrid() {
-        grid.innerHTML = ''; // Clear grid
-        description.textContent = 'Loading products...';
-  
-        const products = Object.entries(projects[currentProject]).map(([productName, models]) => ({
-          name: productName,
-          models: models,
-          url: models[0]?.url
-        }));
-  
-        if (products.length === 0) {
-          description.textContent = 'No products found.';
-          return;
-        }
-  
-        description.textContent = `Select a product:`;
-  
-        const thumbPromises = products.map(async (product) => {
-          let thumbURL = '';
-          if (product.url) {
-            thumbURL = await makeThumbnail.call(this, product.url);
-          }
-          return { product, thumbURL };
-        });
-  
-        const thumbs = await Promise.all(thumbPromises);
-  
-        thumbs.forEach(({ product, thumbURL }) => {
+      if (files && files.length > 0) {
+        thumbs.forEach(({ file, thumbURL }) => {
           const card = document.createElement('div');
-          card.style.cursor = 'pointer';
-          card.style.border = '1px solid #ccc';
-          card.style.borderRadius = '4px';
-          card.style.padding = '10px';
-          card.style.textAlign = 'center';
+          card.style.cssText = `
+            cursor:pointer;box-shadow:0 4px 8px rgba(0,0,0,0.1);
+            border-radius:8px;overflow:hidden;transition:transform .2s;
+            background:#f5f5f5;position:relative;
+          `;
+          card.onmouseover = () => card.style.transform = 'scale(1.05)';
+          card.onmouseout = () => card.style.transform = 'scale(1)';
   
-          const img = document.createElement('img');
-          img.src = thumbURL || 'placeholder.png';
-          img.style.width = '100%';
-          img.style.height = 'auto';
+          // checkbox in top-right corner
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.value = file.url;
+          checkbox.id = file.name;
+          checkbox.style.position = 'absolute';
+          checkbox.style.top = '10px';
+          checkbox.style.right = '10px';
+          checkbox.style.zIndex = '1';
+          checkbox.style.margin = '0';
+  
+          // Use pre-loaded thumbnail
+          const img = new Image();
+          img.src = thumbURL;
+          img.style.cssText = 'width:100%;height:auto;display:block;';
           card.appendChild(img);
   
-          const nameElem = document.createElement('p');
-          nameElem.textContent = product.name;
-          card.appendChild(nameElem);
+          const name = document.createElement('p');
+          name.textContent = file.name;
+          name.style.cssText = `
+            margin:0;padding:8px 0;background:#f5f5f5;
+            font-weight:600;font-size:14px;text-align:center;
+          `;
   
-          card.addEventListener('click', async () => {
-            this.clearExistingModels();
-            const loadOverlay = document.getElementById('loading-overlay');
-            if (loadOverlay) loadOverlay.style.display = 'flex';
-            try {
-              for (const model of product.models) {
-                await this.loadModel(model.url, model.name);
-              }
-            } catch (error) {
-              console.error('Error loading product models:', error);
+          card.appendChild(checkbox);
+          card.appendChild(name);
+  
+          // Make entire card clickable to toggle checkbox
+          card.addEventListener('click', (e) => {
+            if (e.target !== checkbox) {
+              checkbox.checked = !checkbox.checked;
             }
-            if (loadOverlay) loadOverlay.style.display = 'none';
-            document.body.removeChild(modalOverlay);
           });
   
           grid.appendChild(card);
         });
       }
   
-      // Initial update
-      await updateGrid();
+      modalContainer.appendChild(grid);
   
-      // If project select exists, update on change
-      if (projectSelect) {
-        projectSelect.addEventListener('change', async () => {
-          currentProject = projectSelect.value;
-          await updateGrid();
+      const buttonsDiv = document.createElement('div');
+      buttonsDiv.style.marginTop = '30px';
+      buttonsDiv.style.textAlign = 'center';
+  
+      const loadButton = document.createElement('button');
+      loadButton.textContent = 'Load Selected';
+      loadButton.style.backgroundColor = '#d00024';
+      loadButton.style.color = 'white';
+      loadButton.style.border = 'none';
+      loadButton.style.borderRadius = '9999px';
+      loadButton.style.padding = '10px 20px';
+      loadButton.style.cursor = 'pointer';
+  
+      const cancelButton = document.createElement('button');
+      cancelButton.textContent = 'Cancel';
+      cancelButton.style.backgroundColor = 'rgb(153, 153, 153)';
+      cancelButton.style.color = 'white';
+      cancelButton.style.border = 'none';
+      cancelButton.style.borderRadius = '9999px';
+      cancelButton.style.padding = '10px 20px';
+      cancelButton.style.cursor = 'pointer';
+      cancelButton.style.marginRight = '15px';
+  
+      buttonsDiv.appendChild(cancelButton);
+      buttonsDiv.appendChild(loadButton);
+      modalContainer.appendChild(buttonsDiv);
+      modalOverlay.appendChild(modalContainer);
+      document.body.appendChild(modalOverlay);
+  
+      loadButton.addEventListener('click', async () => {
+        const selected = [];
+        grid.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+          selected.push({ url: cb.value, name: cb.id });
         });
-      }
+  
+        if (selected.length > 0) {
+          document.body.removeChild(modalOverlay);
+  
+          if (loadingOverlay) loadingOverlay.style.display = 'flex';
+  
+          this.clearExistingModels();
+  
+          for (const file of selected) {
+            console.log('Loading model:', file.url);
+            await this.loadModel(file.url, file.name.replace('.glb', '').replace('.gltf', ''));
+          }
+  
+          this.fitCameraToScene();
+  
+          if (loadingOverlay) loadingOverlay.style.display = 'none';
+        } else {
+          document.body.removeChild(modalOverlay);
+        }
+      });
+  
+      cancelButton.addEventListener('click', () => {
+        document.body.removeChild(modalOverlay);
+      });
   
     } catch (error) {
-      console.error(error);
       if (loadingOverlay) loadingOverlay.style.display = 'none';
+      console.error("Error fetching models:", error);
+      console.log("Full error details:", error);
+      alert("Error accessing models. Please check the console for details.");
     }
   }
 
