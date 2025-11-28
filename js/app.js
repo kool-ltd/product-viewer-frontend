@@ -139,7 +139,7 @@ class App {
 
   async loadProject(project) {
     try {
-      const response = await fetch('./projects.json'); // Adjust the path if the file is in a different directory
+      const response = await fetch('./js/projects.json'); // Adjust the path if the file is in a different directory
       if (!response.ok) {
         throw new Error(`Failed to load projects.json: ${response.statusText}`);
       }
