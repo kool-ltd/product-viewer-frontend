@@ -662,7 +662,7 @@ class App {
   
     try {
       console.log('Fetching projects.json...');
-      const response = await fetch('./projects.json');
+      const response = await fetch('./js/projects.json');
       console.log('Response:', response);
       const data = await response.json();
       console.log('Data:', data);
