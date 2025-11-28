@@ -6,7 +6,7 @@ import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFa
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { InteractionManager } from './InteractionManager.js';
 import { setupUIControls } from './uiControls.js';
-import { showModal, hideModal, showConfirmationModal } from './modalManager.js';
+import { showConfirmationModal } from './modalManager.js';
 
 class App {
   constructor() {
@@ -905,26 +905,6 @@ class App {
     this.orbitControls.rotateSpeed = 0.5;
     this.orbitControls.enableDamping = true;
     this.orbitControls.dampingFactor = 0.05;
-    fetch('./js/projects.json')  // Adjust path if needed, e.g., './data/projects.json'
-    .then(response => {
-      if (!response.ok) {
-        throw new Error('Failed to load projects.json');
-      }
-      return response.json();
-    })
-    .then(projectData => {
-      // Parse query param for pre-selection
-      const urlParams = new URLSearchParams(window.location.search);
-      const preselectedProject = urlParams.get('project');  // e.g., 'project_A' or null
-  
-      // Always show the browse interface immediately, with optional pre-selection
-      this.showBrowseInterface(projectData, preselectedProject);
-    })
-    .catch(error => {
-      console.error('Error fetching projects.json:', error);
-      showConfirmationModal('Failed to load project configuration. Showing default landing.');
-      this.showLandingOverlay();  // Fallback if JSON fetch fails
-    });
   }
 
   updateDragControls() {
@@ -1357,126 +1337,6 @@ class App {
       }
       this.renderer.render(this.scene, this.camera);
     });
-  }
-
-  showBrowseInterface(projectData, preselectedProject = null) {
-    // Create a custom modal for browsing
-    const modalConfig = {
-      title: 'Browse 3D Models',
-      message: '',  // We'll build the content dynamically
-      buttons: [
-        {
-          text: 'Close',
-          onClick: () => {
-            // Optionally load nothing or show landing if needed
-          }
-        }
-      ]
-    };
-    showModal(modalConfig);
-  
-    // Get the modal content elements to inject hierarchy
-    const modal = document.querySelector('.custom-modal');
-    const messageElem = modal.querySelector('.custom-modal-message');
-    messageElem.style.padding = '0';
-    messageElem.style.overflowY = 'auto';
-    messageElem.style.maxHeight = '60vh';
-  
-    // Build hierarchical UI
-    const container = document.createElement('div');
-    container.style.padding = '20px';
-  
-    // Filter to preselectedProject if provided
-    const projects = preselectedProject && projectData[preselectedProject]
-      ? { [preselectedProject]: projectData[preselectedProject] }
-      : projectData;
-  
-    Object.keys(projects).forEach(projectName => {
-      const projectSection = document.createElement('div');
-      projectSection.style.marginBottom = '20px';
-  
-      const projectHeader = document.createElement('h4');
-      projectHeader.textContent = projectName;
-      projectHeader.style.cursor = 'pointer';
-      projectHeader.style.backgroundColor = '#f0f0f0';
-      projectHeader.style.padding = '10px';
-      projectHeader.style.borderRadius = '4px';
-      projectSection.appendChild(projectHeader);
-  
-      const productContainer = document.createElement('div');
-      productContainer.style.display = preselectedProject ? 'block' : 'none';  // Auto-expand if preselected
-      projectSection.appendChild(productContainer);
-  
-      // Toggle expand/collapse
-      projectHeader.addEventListener('click', () => {
-        productContainer.style.display = productContainer.style.display === 'none' ? 'block' : 'none';
-      });
-  
-      const products = projects[projectName];
-      Object.keys(products).forEach(productName => {
-        const productSection = document.createElement('div');
-        productSection.style.marginLeft = '20px';
-        productSection.style.marginBottom = '10px';
-  
-        const productHeader = document.createElement('h5');
-        productHeader.textContent = productName;
-        productHeader.style.cursor = 'pointer';
-        productHeader.style.padding = '5px';
-        productHeader.style.borderBottom = '1px solid #ddd';
-        productSection.appendChild(productHeader);
-  
-        const partsList = document.createElement('ul');
-        partsList.style.display = 'none';  // Initially collapsed
-        partsList.style.listStyleType = 'none';
-        partsList.style.paddingLeft = '20px';
-        productSection.appendChild(partsList);
-  
-        // Toggle expand/collapse for product
-        productHeader.addEventListener('click', () => {
-          partsList.style.display = partsList.style.display === 'none' ? 'block' : 'none';
-        });
-  
-        const parts = products[productName];
-        parts.forEach(part => {
-          const partItem = document.createElement('li');
-          partItem.style.marginBottom = '5px';
-  
-          const loadButton = document.createElement('button');
-          loadButton.textContent = `Load ${part.name}`;
-          loadButton.style.backgroundColor = '#d00024';
-          loadButton.style.color = 'white';
-          loadButton.style.border = 'none';
-          loadButton.style.borderRadius = '9999px';
-          loadButton.style.padding = '4px 12px';
-          loadButton.style.cursor = 'pointer';
-          loadButton.addEventListener('click', () => {
-            const loadingOverlay = document.getElementById('loading-overlay');
-            if (loadingOverlay) loadingOverlay.style.display = 'flex';
-  
-            this.loadModel(part.url, part.name)
-              .then(() => {
-                if (loadingOverlay) loadingOverlay.style.display = 'none';
-                this.fitCameraToScene();
-                hideModal();  // Close modal after loading
-              })
-              .catch(error => {
-                console.error(`Error loading ${part.name}:`, error);
-                if (loadingOverlay) loadingOverlay.style.display = 'none';
-                showConfirmationModal('Failed to load model.');
-              });
-          });
-  
-          partItem.appendChild(loadButton);
-          partsList.appendChild(partItem);
-        });
-  
-        productContainer.appendChild(productSection);
-      });
-  
-      container.appendChild(projectSection);
-    });
-  
-    messageElem.appendChild(container);
   }
 }
 
