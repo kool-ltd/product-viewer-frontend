@@ -407,7 +407,7 @@ class App {
     thumbScene.add(light);
     thumbScene.add(new THREE.AmbientLight(0x404040, 1.2));
 
-    async function makeThumbnail(url) {
+    const makeThumbnail = async (url) => {
       if (thumbCache.has(url)) return thumbCache.get(url);
 
       // Load the GLB (reuse the same loader you already have in the app)
