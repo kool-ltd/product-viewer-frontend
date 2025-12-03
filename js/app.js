@@ -117,6 +117,8 @@ class App {
    
     const urlParams = new URLSearchParams(window.location.search);
     const project = urlParams.get('project');
+    this.currentProject = project || null;
+    this.projectModels = null;
    
     if (project) {
       this.loadProject(project);
@@ -124,6 +126,10 @@ class App {
       // Default behavior: show the landing overlay
       this.showLandingOverlay();
     }
+   
+    // Create persistent browse button
+    this.createPersistentBrowseButton();
+   
     this.animate();
   }
   async loadProject(project) {
@@ -135,9 +141,9 @@ class App {
       const projectsData = await response.json();
  
       if (projectsData[project]) {
-        const projectModels = projectsData[project];
+        this.projectModels = projectsData[project];
         // Show grouped browsing interface for the project
-        this.showGroupedBrowseInterface(project, projectModels);
+        this.showGroupedBrowseInterface(project, this.projectModels);
       } else {
         // Project not found in JSON, show landing
         this.showLandingOverlay();
@@ -146,6 +152,29 @@ class App {
       console.error('Error fetching projects.json:', error);
       this.showLandingOverlay();
     }
+  }
+  createPersistentBrowseButton() {
+    this.browseBtn = document.createElement('button');
+    this.browseBtn.textContent = 'Browse Models';
+    this.browseBtn.style.position = 'absolute';
+    this.browseBtn.style.top = '10px';
+    this.browseBtn.style.left = '10px';
+    this.browseBtn.style.padding = '8px 16px';
+    this.browseBtn.style.border = 'none';
+    this.browseBtn.style.borderRadius = '4px';
+    this.browseBtn.style.background = '#d00024';
+    this.browseBtn.style.color = '#fff';
+    this.browseBtn.style.fontSize = '13px';
+    this.browseBtn.style.cursor = 'pointer';
+    this.browseBtn.style.zIndex = '10000';
+    this.browseBtn.onclick = () => {
+      if (this.currentProject && this.projectModels) {
+        this.showGroupedBrowseInterface(this.currentProject, this.projectModels);
+      } else {
+        this.showBrowseInterface();
+      }
+    };
+    document.body.appendChild(this.browseBtn);
   }
   // Ensure FontAwesome is loaded
   ensureFontAwesomeLoaded() {
