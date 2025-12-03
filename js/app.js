@@ -149,6 +149,14 @@ class App {
       this.showLandingOverlay();
     }
   }
+  titleCase(str) {
+    return str
+      .replace(/_/g, ' ')
+      .toLowerCase()
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  }
   // Ensure FontAwesome is loaded
   ensureFontAwesomeLoaded() {
     if (!document.querySelector('link[href*="font-awesome"]')) {
@@ -542,7 +550,8 @@ class App {
     if (window.innerWidth < 768) {
       modalContainer.style.width = '100vw';
       modalContainer.style.height = '100dvh';
-      modalContainer.style.borderRadius = '0';
+      modalContainer.style.borderRadius = '8px';
+      modalContainer.style.margin = '20px';
       modalContainer.style.padding = '20px';
     }
 
@@ -703,12 +712,13 @@ class App {
     if (window.innerWidth < 768) {
       modalContainer.style.width = '100vw';
       modalContainer.style.height = '100dvh';
-      modalContainer.style.borderRadius = '0';
+      modalContainer.style.borderRadius = '8px';
+      modalContainer.style.margin = '20px';
       modalContainer.style.padding = '20px';
     }
 
     const title = document.createElement('h2');
-    title.textContent = `Browse ${project.replace(/_/g, ' ')} Models`;
+    title.textContent = `Browse ${this.titleCase(project)} Models`;
     title.style.marginBottom = '10px';
     modalContainer.appendChild(title);
     const description = document.createElement('p');
