@@ -20,7 +20,17 @@
     ]
   },
   "dripez": {
-    "url":"./models/SecondZ - 1.9L - Square.glb",
-    "name": "SecondZ - 1.9L - Square"
+    "SecondZ": [
+      {
+        "url": "./models/SecondZ - 1.9L - Square.glb",
+        "name": "SecondZ - 1.9L - Square"
+      },
+    ],
+    "Pre Tub": [
+      {
+        "url": "./models/project_A/DripEZ - Prep Tub - XL.glb",
+        "name": "DripEZ - Prep Tub - XL"
+      }
+    ]
   }
 }
