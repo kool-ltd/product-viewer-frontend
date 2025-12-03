@@ -126,10 +126,6 @@ class App {
       // Default behavior: show the landing overlay
       this.showLandingOverlay();
     }
-   
-    // Create persistent browse button
-    this.createPersistentBrowseButton();
-   
     this.animate();
   }
   async loadProject(project) {
@@ -152,29 +148,6 @@ class App {
       console.error('Error fetching projects.json:', error);
       this.showLandingOverlay();
     }
-  }
-  createPersistentBrowseButton() {
-    this.browseBtn = document.createElement('button');
-    this.browseBtn.textContent = 'Browse Models';
-    this.browseBtn.style.position = 'absolute';
-    this.browseBtn.style.top = '10px';
-    this.browseBtn.style.left = '10px';
-    this.browseBtn.style.padding = '8px 16px';
-    this.browseBtn.style.border = 'none';
-    this.browseBtn.style.borderRadius = '4px';
-    this.browseBtn.style.background = '#d00024';
-    this.browseBtn.style.color = '#fff';
-    this.browseBtn.style.fontSize = '13px';
-    this.browseBtn.style.cursor = 'pointer';
-    this.browseBtn.style.zIndex = '10000';
-    this.browseBtn.onclick = () => {
-      if (this.currentProject && this.projectModels) {
-        this.showGroupedBrowseInterface(this.currentProject, this.projectModels);
-      } else {
-        this.showBrowseInterface();
-      }
-    };
-    document.body.appendChild(this.browseBtn);
   }
   // Ensure FontAwesome is loaded
   ensureFontAwesomeLoaded() {
@@ -485,6 +458,11 @@ class App {
   // Flat Browser-Based File Browser (for demos)
   // -----------------------------------------------------------------------------
   async showBrowseInterface() {
+    if (this.currentProject && this.projectModels) {
+      await this.showGroupedBrowseInterface(this.currentProject, this.projectModels);
+      return;
+    }
+
     const loadingOverlay = document.getElementById('loading-overlay');
     if (loadingOverlay) loadingOverlay.style.display = 'flex';
 
