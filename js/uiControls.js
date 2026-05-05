@@ -54,12 +54,14 @@ function getMaterialsByName(app) {
             material.userData.originalColor = '#' + material.color.getHexString();
           }
           
-          // Store with reference to the mesh and material for later updating
-          materialMap.set(fullName, {
-            model: modelName,
-            mesh: child,
-            material: material
-          });
+          if (!materialMap.has(fullName)) {
+            materialMap.set(fullName, {
+              model: modelName,
+              meshes: [],
+              material: material
+            });
+          }
+          materialMap.get(fullName).meshes.push(child);
         });
       }
     });
@@ -68,7 +70,26 @@ function getMaterialsByName(app) {
   return materialMap;
 }
 
-// Color picker modal
+// Function to fit the scene preserving the current view direction
+function fitPreservingView(app) {
+  if (!app.productGroup) return;
+
+  const box = new THREE.Box3().setFromObject(app.productGroup);
+  const size = box.getSize(new THREE.Vector3());
+  const maxSize = Math.max(size.x, size.y, size.z);
+
+  const currentDir = app.orbitControls.target.clone().sub(app.camera.position).normalize();
+
+  const fitHeightDistance = maxSize / (2 * Math.tan(app.camera.fov * Math.PI / 360));
+  const fitWidthDistance = fitHeightDistance / app.camera.aspect;
+  const newDistance = 2 * Math.max(fitHeightDistance, fitWidthDistance);
+
+  app.camera.position.copy(app.orbitControls.target.clone().sub(currentDir.multiplyScalar(newDistance)));
+  app.camera.lookAt(app.orbitControls.target);
+  app.orbitControls.update();
+}
+
+// Color picker interface
 function showMaterialColorPicker(app) {
   // Get materials
   const materialMap = getMaterialsByName(app);
@@ -76,26 +97,54 @@ function showMaterialColorPicker(app) {
     alert('No colorable parts found in the current model.');
     return;
   }
-  
-  // Create modal overlay
-  const overlay = document.createElement('div');
-  overlay.style.position = 'fixed';
-  overlay.style.top = '0';
-  overlay.style.left = '0';
-  overlay.style.width = '100%';
-  overlay.style.height = '100%';
-  overlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
-  overlay.style.display = 'flex';
-  overlay.style.alignItems = 'center';
-  overlay.style.justifyContent = 'center';
-  overlay.style.zIndex = '10000';
-  
-  const modal = document.createElement('div');
-  modal.style.backgroundColor = 'white';
-  modal.style.padding = '20px';
-  modal.style.borderRadius = '8px';
-  modal.style.width = '300px';
-  
+
+  // Store original colors at the time of opening
+  const originalColors = new Map();
+  materialMap.forEach((data, key) => {
+    originalColors.set(key, '#' + data.material.color.getHexString());
+  });
+
+  // Store original opacities for all meshes
+  const originalOpacities = new Map();
+  app.productGroup.traverse((obj) => {
+    if (obj.isMesh) {
+      originalOpacities.set(obj, {
+        transparent: obj.material.transparent,
+        opacity: obj.material.opacity
+      });
+    }
+  });
+
+  // Resize the scene container to upper part (65vh)
+  const sceneContainer = document.getElementById('scene-container');
+  sceneContainer.style.height = '65vh';
+  sceneContainer.style.top = '0';
+
+  // Update renderer and camera to fit the new size
+  app.renderer.setSize(sceneContainer.clientWidth, sceneContainer.clientHeight);
+  app.camera.aspect = sceneContainer.clientWidth / sceneContainer.clientHeight;
+  app.camera.updateProjectionMatrix();
+  fitPreservingView(app);
+
+  // Create lower panel for color picker
+  const panel = document.createElement('div');
+  panel.id = 'color-picker-panel';
+  panel.style.position = 'fixed';
+  panel.style.bottom = '0';
+  panel.style.left = '0';
+  panel.style.width = '100%';
+  panel.style.height = '35vh';
+  panel.style.backgroundColor = 'white';
+  panel.style.zIndex = '10000';
+  panel.style.overflowY = 'auto';
+  panel.style.display = 'flex';
+  panel.style.alignItems = 'center';
+  panel.style.justifyContent = 'center';
+
+  const container = document.createElement('div');
+  container.style.padding = '20px';
+  container.style.width = '300px';
+
   const heading = document.createElement('h3');
   heading.textContent = 'Select Part to Color';
   heading.style.marginTop = '0';
@@ -118,18 +167,36 @@ function showMaterialColorPicker(app) {
   
   // Color picker section
   const colorPickerWrapper = document.createElement('div');
+  colorPickerWrapper.style.display = 'flex';
+  colorPickerWrapper.style.alignItems = 'center';
+  colorPickerWrapper.style.gap = '10px';
   
   // Input for the color picker
   const colorInput = document.createElement('input');
   colorInput.type = 'color';
   colorInput.style.padding = 'revert';
-  // colorInput.style.width = '100%';
   colorInput.value = '#ff0000'; // Default red
   colorInput.style.marginBottom = '15px';
   
+  // Save button next to color input
+  const saveBtn = document.createElement('button');
+  saveBtn.textContent = 'Save';
+  saveBtn.style.backgroundColor = 'rgb(102, 102, 102)';
+  saveBtn.style.color = 'white';
+  saveBtn.style.border = 'none';
+  saveBtn.style.borderRadius = '9999px';
+  saveBtn.style.padding = '6px 19px';
+  saveBtn.style.cursor = 'pointer';
+  saveBtn.style.marginBottom = '15px';
+  saveBtn.addEventListener('click', () => {
+    const colorValue = colorInput.value;
+    addRecentColor(colorValue);
+    updateRecentColorsUI();
+  });
+  
   // Recent colors section
   const recentColorsHeading = document.createElement('h4');
-  recentColorsHeading.textContent = 'Colors';
+  recentColorsHeading.textContent = 'Color History';
   recentColorsHeading.style.marginBottom = '10px';
   
   const recentColorsDiv = document.createElement('div');
@@ -169,6 +236,7 @@ function showMaterialColorPicker(app) {
       
       originalColorBtn.addEventListener('click', () => {
         colorInput.value = originalColor;
+        applyColorToMaterial(app, materialMap, selectedMaterialKey, originalColor);
       });
       
       originalColorWrapper.appendChild(originalColorBtn);
@@ -189,9 +257,40 @@ function showMaterialColorPicker(app) {
       
       colorBtn.addEventListener('click', () => {
         colorInput.value = color;
+        applyColorToMaterial(app, materialMap, selectedMaterialKey, color);
       });
       
       recentColorsDiv.appendChild(colorBtn);
+    });
+  }
+
+  // Function to dim non-selected meshes
+  function dimNonSelected(selectedMeshes) {
+    app.productGroup.traverse((obj) => {
+      if (obj.isMesh) {
+        if (!selectedMeshes.includes(obj)) {
+          obj.material.transparent = true;
+          obj.material.opacity = 0.2;
+          obj.material.needsUpdate = true;
+        } else {
+          const orig = originalOpacities.get(obj);
+          obj.material.transparent = orig.transparent;
+          obj.material.opacity = orig.opacity;
+          obj.material.needsUpdate = true;
+        }
+      }
+    });
+  }
+
+  // Function to restore opacities
+  function restoreOpacities() {
+    app.productGroup.traverse((obj) => {
+      if (obj.isMesh && originalOpacities.has(obj)) {
+        const orig = originalOpacities.get(obj);
+        obj.material.transparent = orig.transparent;
+        obj.material.opacity = orig.opacity;
+        obj.material.needsUpdate = true;
+      }
     });
   }
   
@@ -202,6 +301,7 @@ function showMaterialColorPicker(app) {
   
   // Apply button
   const applyBtn = document.createElement('button');
+  applyBtn.className = 'color-apply-btn';
   applyBtn.textContent = 'Apply';
   applyBtn.style.backgroundColor = '#d00024';
   applyBtn.style.color = 'white';
@@ -214,14 +314,19 @@ function showMaterialColorPicker(app) {
     const selectedMaterialKey = materialSelect.value;
     const colorValue = colorInput.value;
     
-    // Apply the color
-    applyColorToMaterial(app, materialMap, selectedMaterialKey, colorValue);
-    
-    // Save to recent colors
+    // Add to recent colors
     addRecentColor(colorValue);
     
-    // Close the modal
-    document.body.removeChild(overlay);
+    // Restore opacities
+    restoreOpacities();
+    
+    // Close the panel
+    document.body.removeChild(panel);
+    sceneContainer.style.height = '100%';
+    app.renderer.setSize(window.innerWidth, window.innerHeight);
+    app.camera.aspect = window.innerWidth / window.innerHeight;
+    app.camera.updateProjectionMatrix();
+    // Do not call fit to keep last view
   });
   
   // Cancel button
@@ -235,35 +340,71 @@ function showMaterialColorPicker(app) {
   cancelBtn.style.cursor = 'pointer';
   cancelBtn.style.marginRight = '15px';
   cancelBtn.addEventListener('click', () => {
-    document.body.removeChild(overlay);
+    // Restore original colors
+    materialMap.forEach((data, key) => {
+      data.material.color.set(new THREE.Color(originalColors.get(key)));
+      data.material.needsUpdate = true;
+    });
+    
+    // Restore opacities
+    restoreOpacities();
+    
+    // Close the panel
+    document.body.removeChild(panel);
+    sceneContainer.style.height = '100%';
+    app.renderer.setSize(window.innerWidth, window.innerHeight);
+    app.camera.aspect = window.innerWidth / window.innerHeight;
+    app.camera.updateProjectionMatrix();
+    // Do not call fit to keep last view
   });
   
-  // Assemble the modal
+  // Assemble the container
   buttonsDiv.appendChild(cancelBtn);
   buttonsDiv.appendChild(applyBtn);
   
   colorPickerWrapper.appendChild(colorInput);
+  colorPickerWrapper.appendChild(saveBtn);
   
-  modal.appendChild(heading);
-  modal.appendChild(materialSelect);
-  modal.appendChild(colorPickerWrapper);
-  modal.appendChild(recentColorsHeading);
-  modal.appendChild(recentColorsDiv);
-  modal.appendChild(buttonsDiv);
+  container.appendChild(heading);
+  container.appendChild(materialSelect);
+  container.appendChild(colorPickerWrapper);
+  container.appendChild(recentColorsHeading);
+  container.appendChild(recentColorsDiv);
+  container.appendChild(buttonsDiv);
   
-  overlay.appendChild(modal);
-  document.body.appendChild(overlay);
+  panel.appendChild(container);
+  document.body.appendChild(panel);
   
   // Set the initial color based on the selected material
   updateColorFromSelectedMaterial(materialMap, materialSelect, colorInput);
   
   // Update recent colors UI initially
   updateRecentColorsUI();
+
+  // Highlight initial material
+  const initialMaterialKey = materialSelect.value;
+  const initialMaterialData = materialMap.get(initialMaterialKey);
+  if (initialMaterialData) {
+    dimNonSelected(initialMaterialData.meshes);
+  }
   
   // Update when material changes
   materialSelect.addEventListener('change', () => {
+    restoreOpacities();
     updateColorFromSelectedMaterial(materialMap, materialSelect, colorInput);
     updateRecentColorsUI();
+    const selectedMaterialKey = materialSelect.value;
+    const materialData = materialMap.get(selectedMaterialKey);
+    if (materialData) {
+      dimNonSelected(materialData.meshes);
+    }
+  });
+
+  // Live color update
+  colorInput.addEventListener('input', () => {
+    const selectedMaterialKey = materialSelect.value;
+    const colorValue = colorInput.value;
+    applyColorToMaterial(app, materialMap, selectedMaterialKey, colorValue);
   });
 }
 
@@ -287,6 +428,7 @@ function applyColorToMaterial(app, materialMap, materialKey, colorValue) {
     // Convert hex to RGB
     const color = new THREE.Color(colorValue);
     materialData.material.color.set(color);
+    materialData.material.needsUpdate = true;
   }
 }
 
@@ -350,7 +492,13 @@ function createColorButton(app) {
   });
   
   colorButton.addEventListener('click', () => {
-    showMaterialColorPicker(app);
+    const existingPanel = document.getElementById('color-picker-panel');
+    if (existingPanel) {
+      const apply = existingPanel.querySelector('.color-apply-btn');
+      if (apply) apply.click();
+    } else {
+      showMaterialColorPicker(app);
+    }
   });
   
   return colorButton;

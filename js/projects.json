@@ -1,0 +1,44 @@
+{
+  "project_A": {
+    "product_A": [
+      {
+        "url": "./models/project_A/DripEZ - Prep Tub - XL.glb",
+        "name": "Prep Tub - XL"
+      }
+    ]
+  },
+  "project_B": {
+    "product_A": [
+      {
+        "url": "./models/project_A/DripEZ - Prep Tub - XXL.glb",
+        "name": "Prep Tub - XXL"
+      },
+      {
+        "url": "./models/project_A/DripEZ - Prep Tub - XXXL.glb",
+        "name": "DripEZ - Prep Tub - XXXL"
+      }
+    ]
+  },
+  "dripez": {
+    "SecondZ": [
+      {
+        "url": "./models/SecondZ - 1.9L - Square.glb",
+        "name": "SecondZ - 1.9L - Square"
+      },
+      {
+        "url": "./models/SecondZ - 2.6L - Rect.glb",
+        "name": "SecondZ - 2.6L - Rect"
+      }
+    ],
+    "Pre Tub": [
+      {
+        "url": "./models/project_A/DripEZ - Prep Tub - XL.glb",
+        "name": "DripEZ - Prep Tub - XL"
+      },
+      {
+        "url": "./models/project_A/DripEZ - Prep Tub - XXL.glb",
+        "name": "DripEZ - Prep Tub - XXL"
+      }
+    ]
+  }
+}
